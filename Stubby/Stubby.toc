@@ -5,7 +5,7 @@
 ## OptionalDeps: !nLog, DebugLib
 ## SavedVariables: StubbyConfig
 ##
-## Version: 12.x (Midnight's Revenge)
+## Version: 12.x-forever.2
 ## Revision: $Id$
 ## Author: Norganna's AddOns
 ## X-Part-Of: Libraries

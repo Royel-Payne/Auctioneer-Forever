@@ -6,7 +6,7 @@
 ## Interface: 120000, 120005, 120007, 120100, 16001
 ## SavedVariables: SwatterData
 ##
-## Version: 12.x.x (Midnight)
+## Version: 12.x-forever.2
 ## Revision: $Id$
 ## Author: Norganna's AddOns
 ## X-Part-Of: Libraries
