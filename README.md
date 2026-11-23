@@ -1,3 +1,5 @@
+> **Fork note:** this fork of [NoobyGains/Auctioneer-Forever](https://github.com/NoobyGains/Auctioneer-Forever) keeps the addon running on WoW: Forever (live) while upstream is inactive. It merges upstream PRs #2 (Enchantrix `UseItemByName` fix), #3 (SlideBar mouse handler fix) and #4 (faster scans, tooltip prices for links and random-suffix items, Deal finder / Valuer / Statistics bug fixes). Fixes go to `main`; install from the `main` branch.
+
 # Auctioneer for World of Warcraft: Forever
 
 The Auctioneer addon suite made to run on the **WoW: Forever client**. It is
