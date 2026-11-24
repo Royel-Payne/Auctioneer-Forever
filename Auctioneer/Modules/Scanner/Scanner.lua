@@ -116,10 +116,11 @@ function Module:AutoScan(tries)
 		return
 	end
 	if age then
-		print(format("|cffffd100Auctioneer:|r prices are from %s, scanning the auction house.", Auctioneer:Ago(age)))
+		print(format("|cffffd100Auctioneer:|r last scan was %s, scanning the auction house.", Auctioneer:Ago(age)))
 	else
-		print("|cffffd100Auctioneer:|r no prices yet, scanning the auction house.")
+		print("|cffffd100Auctioneer:|r no scan yet, scanning the auction house.")
 	end
+	Module.autoQueryPending = true
 	C_AuctionHouse.SendBrowseQuery({
 		searchString = "",
 		sorts = {},
@@ -135,6 +136,9 @@ function Module:HookSearch()
 		self.queryHooked = true
 		hooksecurefunc(C_AuctionHouse, "SendBrowseQuery", function(query)
 			Module.lastQueryFull = Module.IsFullQuery(query)
+			-- Our own auto-scan query, or one the player started.
+			Module.lastQueryAuto = Module.autoQueryPending or false
+			Module.autoQueryPending = false
 		end)
 	end
 
@@ -144,9 +148,9 @@ function Module:HookSearch()
 		button:HookScript("OnEnter", function(b)
 			GameTooltip:SetOwner(b, "ANCHOR_RIGHT")
 			GameTooltip:SetText("Search")
-			GameTooltip:AddLine("Auctioneer: with an empty search box this also refreshes all prices.", 1, 1, 1, true)
+			GameTooltip:AddLine("Auctioneer: leave the search box empty to scan the whole auction house.", 1, 1, 1, true)
 			local age = Module:ScanAge()
-			GameTooltip:AddLine(age and ("Last full scan: "..Auctioneer:Ago(age)) or "No full scan yet.", 0.6, 0.6, 0.6, true)
+			GameTooltip:AddLine(age and ("Last scan: "..Auctioneer:Ago(age)) or "No scan yet.", 0.6, 0.6, 0.6, true)
 			GameTooltip:Show()
 		end)
 		button:HookScript("OnLeave", function() GameTooltip:Hide() end)
@@ -179,6 +183,7 @@ function Module:Fetch(type, results)
 	if type == "updated" then
 		self.scanning = true
 		self.fullScan = Module.lastQueryFull
+		self.autoScan = Module.lastQueryAuto
 		self.complete = false
 		self.browseResults = C_AuctionHouse.GetBrowseResults()
 		self.browseSize = 12000
@@ -288,6 +293,8 @@ function Module:Push()
 	end
 
 	local items = self:Collect()
+	local auto = self.autoScan
+	self.autoScan = false
 	-- This scan's timing travels with its push: a new scan may start meanwhile.
 	local marks = self.marks
 	self.marks = nil
@@ -330,7 +337,8 @@ function Module:Push()
 			marks.pushed = GetTime()
 		end
 		self:ReportTiming(#items, marks)
-		Auctioneer:Trigger(Const.ScannerItemsCompleted, items)
+		-- auto: the scan Auctioneer started on opening, not one the player clicked.
+		Auctioneer:Trigger(Const.ScannerItemsCompleted, items, auto)
 	end)()
 end
 

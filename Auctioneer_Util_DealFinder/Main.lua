@@ -87,7 +87,9 @@ function Module.Evaluate(itemPrice, vendorPrice, usual, points)
 end
 
 -- This is where we spring into action to find some deals
-function Module:ScannerItemsCompleted(items)
+-- After a scan the player started, show the deals. After the auto-scan on
+-- opening, only update them: the panel stays shut unless it is already open.
+function Module:ScannerItemsCompleted(items, auto)
 	local deals = {}
 	local options = {
 		weighted = true,
@@ -105,6 +107,9 @@ function Module:ScannerItemsCompleted(items)
 	table.sort(deals, function(a, b) return a[4] > b[4] end)
 	self.deals = deals
 
+	if auto and not resultsFrame:IsShown() then
+		return
+	end
 	resultsFrame.scroll:SetValue(1)
 	self:Display()
 end

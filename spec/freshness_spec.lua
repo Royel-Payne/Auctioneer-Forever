@@ -61,6 +61,27 @@ describe("Freshness", function()
 		end)
 	end)
 
+	describe("deal finder after a scan", function()
+		local function completedAuto()
+			for i = #A.triggers, 1, -1 do
+				local t = A.triggers[i]
+				if t.name == "ScannerItemsCompleted" then return t.args[2] end
+			end
+		end
+
+		it("is told when the scan was the auto-scan on opening", function()
+			scanner.lastQueryAuto = true
+			A.scan(addon.rows(3))
+			assert.is_true(completedAuto())
+		end)
+
+		it("is told when the player started the scan", function()
+			scanner.lastQueryAuto = false
+			A.scan(addon.rows(3))
+			assert.is_false(completedAuto())
+		end)
+	end)
+
 	describe("ages", function()
 		it("reads naturally", function()
 			assert.are.equal("just now", A.Auctioneer:Ago(30))

@@ -8,7 +8,7 @@
 ## SavedVariables: AuctioneerConfig, AuctioneerData, AuctioneerServers, AuctioneerLog
 ## SavedVariablesPerCharacter: AuctioneerLocal
 ##
-## Version: 12.x-forever.11
+## Version: 12.x-forever.12
 ## Revision: $Id$
 ## Author: Norganna's AddOns
 ## X-Part-Of: Auctioneer
