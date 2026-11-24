@@ -126,6 +126,11 @@ local function newAH(env)
 		return #ah.delivered == #ah.rows
 	end
 
+	-- Browse queries the addon sends (the auto-scan); recorded, not answered:
+	-- specs drive results with ah:scan().
+	ah.queries = {}
+	function api.SendBrowseQuery(query) table.insert(ah.queries, query) end
+
 	function api.IsThrottledMessageSystemReady()
 		return env.clock.now >= ah.readyAt
 	end

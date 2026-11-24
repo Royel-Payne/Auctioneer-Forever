@@ -7,7 +7,7 @@
 ## OptionalDependencies: !nLog, SlideBar, Configator, Babylonian, DebugLib, TipHelper, LibExtraTip, LibDataBroker
 ## SavedVariables: AuctioneerUtilDealFinderData
 ##
-## Version: 12.x-forever.10
+## Version: 12.x-forever.11
 ## Revision: $Id$
 ## Author: Norganna's AddOns
 ## X-Part-Of: Auctioneer

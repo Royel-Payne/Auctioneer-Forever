@@ -122,6 +122,19 @@ function Internal:Log(fmt, ...)
 	end
 end
 
+-- "12 min ago", "3 h ago", "2 days ago" for an age in seconds.
+function Internal:Ago(seconds)
+	seconds = math.max(0, seconds or 0)
+	if seconds < 60 then
+		return "just now"
+	elseif seconds < 3600 then
+		return format("%d min ago", seconds / 60)
+	elseif seconds < 2 * 86400 then
+		return format("%d h ago", seconds / 3600)
+	end
+	return format("%d days ago", seconds / 86400)
+end
+
 -- Add the module to our list.
 function Internal:Add(module)
 	tinsert(self.modules, module)

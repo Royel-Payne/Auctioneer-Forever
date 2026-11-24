@@ -39,9 +39,118 @@ function Module:BrowseResultsAvailable(type, results)
 	self:Fetch(type, results)
 end
 
+-- A full scan is a browse with an empty search box, no category, no level range
+-- and Blizzard's default filters. Opening the auction house starts one when the
+-- last full scan is older than this. One scan per visit, because you opened it:
+-- Auctioneer never searches on a timer.
+local SCAN_STALE_SECONDS = 3600
+
+-- Blizzard's default browse filters, as the array a query carries.
+local function defaultFilters()
+	local filters = {}
+	for filter, on in pairs(AUCTION_HOUSE_DEFAULT_FILTERS or {}) do
+		if on then
+			tinsert(filters, filter)
+		end
+	end
+	return filters
+end
+
+local function sameSet(a, b)
+	if #a ~= #b then return false end
+	local seen = {}
+	for _, v in ipairs(a) do seen[v] = true end
+	for _, v in ipairs(b) do
+		if not seen[v] then return false end
+	end
+	return true
+end
+
+function Module.IsFullQuery(query)
+	if not query or (query.searchString or "") ~= "" then return false end
+	if query.itemClassFilters and #query.itemClassFilters > 0 then return false end
+	if (query.minLevel or 0) > 0 or (query.maxLevel or 0) > 0 then return false end
+	if AUCTION_HOUSE_DEFAULT_FILTERS and not sameSet(query.filters or {}, defaultFilters()) then
+		return false
+	end
+	return true
+end
+
+-- Seconds since the last full scan finished, or nil if there never was one.
+function Module:ScanAge()
+	local last = AuctioneerData and AuctioneerData.lastFullScan
+	return last and (GetServerTime() - last)
+end
+
 function Module:AuctionHouseOpened()
-	print("Welcome to Auctioneer, click the \"Search\" button to begin a scan")
 	self:Reset()
+	self:HookSearch()
+	if self.autoScanPending then
+		return
+	end
+	self.autoScanPending = true
+	-- Let the auction house finish opening before searching.
+	C_Timer.After(1, function()
+		self.autoScanPending = false
+		self:AutoScan(5)
+	end)
+end
+
+-- Start a full scan if the prices are stale. Retries a few times while the
+-- auction house throttle is busy.
+function Module:AutoScan(tries)
+	if not (AuctionHouseFrame and AuctionHouseFrame:IsShown()) or self.scanning then
+		return
+	end
+	if AuctionHouseFrame:GetDisplayMode() ~= AuctionHouseFrameDisplayMode.Buy then
+		return
+	end
+	local age = self:ScanAge()
+	if age and age < SCAN_STALE_SECONDS then
+		return
+	end
+	if not C_AuctionHouse.IsThrottledMessageSystemReady() then
+		if tries > 1 then
+			C_Timer.After(1, function() self:AutoScan(tries - 1) end)
+		end
+		return
+	end
+	if age then
+		print(format("|cffffd100Auctioneer:|r prices are from %s, scanning the auction house.", Auctioneer:Ago(age)))
+	else
+		print("|cffffd100Auctioneer:|r no prices yet, scanning the auction house.")
+	end
+	C_AuctionHouse.SendBrowseQuery({
+		searchString = "",
+		sorts = {},
+		filters = defaultFilters(),
+		itemClassFilters = {},
+	})
+end
+
+-- Note which kind of browse each search is, whoever sent it (post-hook, reads only).
+-- And a hint on Blizzard's Search button: an empty search is also a price scan.
+function Module:HookSearch()
+	if not self.queryHooked then
+		self.queryHooked = true
+		hooksecurefunc(C_AuctionHouse, "SendBrowseQuery", function(query)
+			Module.lastQueryFull = Module.IsFullQuery(query)
+		end)
+	end
+
+	local button = AuctionHouseFrame and AuctionHouseFrame.SearchBar and AuctionHouseFrame.SearchBar.SearchButton
+	if button and not self.buttonHooked then
+		self.buttonHooked = true
+		button:HookScript("OnEnter", function(b)
+			GameTooltip:SetOwner(b, "ANCHOR_RIGHT")
+			GameTooltip:SetText("Search")
+			GameTooltip:AddLine("Auctioneer: with an empty search box this also refreshes all prices.", 1, 1, 1, true)
+			local age = Module:ScanAge()
+			GameTooltip:AddLine(age and ("Last full scan: "..Auctioneer:Ago(age)) or "No full scan yet.", 0.6, 0.6, 0.6, true)
+			GameTooltip:Show()
+		end)
+		button:HookScript("OnLeave", function() GameTooltip:Hide() end)
+	end
 end
 
 function Module:AuctionHouseClosed()
@@ -69,6 +178,8 @@ function Module:Fetch(type, results)
 
 	if type == "updated" then
 		self.scanning = true
+		self.fullScan = Module.lastQueryFull
+		self.complete = false
 		self.browseResults = C_AuctionHouse.GetBrowseResults()
 		self.browseSize = 12000
 		self:InvertedProgress(false)
@@ -84,6 +195,7 @@ function Module:Fetch(type, results)
 
 	local numResults = #self.browseResults
 	if C_AuctionHouse.HasFullBrowseResults() then
+		self.complete = true
 		self:Mark("fetched")
 		return self:Push()
 	end
@@ -169,6 +281,11 @@ function Module:Push()
 		return
 	end
 	self.scanning = false
+	-- Only a finished full scan counts as fresh prices; a filtered search or
+	-- one cut short by a tab switch does not.
+	if self.fullScan and self.complete and AuctioneerData then
+		AuctioneerData.lastFullScan = GetServerTime()
+	end
 
 	local items = self:Collect()
 	-- This scan's timing travels with its push: a new scan may start meanwhile.

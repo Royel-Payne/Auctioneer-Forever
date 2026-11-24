@@ -23,14 +23,15 @@ To update, do the same with a newer zip.
 
 ## Using it
 
-- **Scan prices:** open the auction house, stay on the **Buy** tab, leave the search box
-  empty and click **Search**. Auctioneer reads every page and saves the prices. A full scan
-  takes a little while; do one now and then to keep prices fresh.
+- **Scan prices:** happens by itself. When you open the auction house and the prices are
+  over an hour old, Auctioneer scans once and says so in chat. To rescan by hand, click
+  **Search** with the search box empty (hover the button to see when the last scan was).
+  Auctioneer never searches on a timer.
 - **Tooltips:** item tooltips show the prices from your scans.
 - **Deal finder:** after a scan, a panel next to the auction house lists items posted
   below their usual price.
 - **Selling:** on the **Sell** tab, put an item in the slot. The **Valuer** panel shows
-  its price history and a **vendor check**: whether the auction pays more than a vendor
+  its price history (with when it was last seen at auction) and a **vendor check**: whether the auction pays more than a vendor
   after the auction house's 5% cut, the deposit you lose if it doesn't sell, and the
   lowest price that beats the vendor.
 - **Swapping the sell item:** drop a different item on the sell slot and the old one

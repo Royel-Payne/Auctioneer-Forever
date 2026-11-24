@@ -82,6 +82,19 @@ local function addCount(lines, label, value)
 	line:Set(label, value)
 end
 
+-- When an item was last seen at auction: hours since its newest data point.
+-- Older than this and the price history is shown as stale (orange).
+local STALE_HOURS = 6
+function Module.HoursSinceSeen(stat, now)
+	local newest
+	for _, point in ipairs(stat.points or {}) do
+		if point.timeslice and (not newest or point.timeslice > newest) then
+			newest = point.timeslice
+		end
+	end
+	return newest and math.max(0, now - newest)
+end
+
 -- Section title in Blizzard's gold heading colour.
 local function addHeader(lines, text)
 	lines:AddSingleLine(LABEL_SIZE, "LEFT", LABEL_FONT):Set("|cffffd100"..text.."|r")
@@ -144,6 +157,15 @@ function Module:Render(sellFrame)
 		end
 
 		addCount(lines, " - data points", "x"..number)
+
+		local hours = Module.HoursSinceSeen(stat, Auctioneer:Timeslice())
+		if hours then
+			local text = hours < 1 and "this hour" or Auctioneer:Ago(hours * 3600)
+			if hours >= STALE_HOURS then
+				text = "|cffff9933"..text.."|r"
+			end
+			addCount(lines, " - last seen", text)
+		end
 	end
 
 	self:AddVendorCheck(lines, sellFrame)
