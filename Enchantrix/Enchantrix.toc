@@ -9,7 +9,7 @@
 ## SavedVariablesPerCharacter: AutoDisenchantIgnoreList
 ## IconTexture: Interface/Addons/Enchantrix/Skin/EnxOrb.blp
 ##
-## Version: 12.x-forever.7
+## Version: 12.x-forever.8
 ## Revision: $Id$
 ## Author: Norganna's AddOns
 ## X-Part-Of: Auctioneer

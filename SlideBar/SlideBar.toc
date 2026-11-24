@@ -6,7 +6,7 @@
 ## LoadOnDemand: 0
 ## SavedVariables: SlideBarConfig
 ##
-## Version: 12.x-forever.7
+## Version: 12.x-forever.8
 ## Revision: $Id$
 ## Author: Norganna's AddOns
 ## X-Part-Of: Libraries

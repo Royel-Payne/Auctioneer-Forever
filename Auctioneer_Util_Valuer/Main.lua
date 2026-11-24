@@ -76,7 +76,9 @@ end
 -- A label with a number on the right; the number uses the money column's font.
 local function addCount(lines, label, value)
 	local line = lines:AddDoubleLine(LABEL_SIZE, LABEL_FONT)
-	line.right:SetFont("Fonts\\ARIALN.TTF", 12, "OUTLINE")
+	if line.right then
+		line.right:SetFont("Fonts\\ARIALN.TTF", 12, "OUTLINE")
+	end
 	line:Set(label, value)
 end
 
