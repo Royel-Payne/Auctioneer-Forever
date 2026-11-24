@@ -161,7 +161,11 @@ local function getTexture(parent, file, r, g, b)
 	texture:SetDrawLayer("BACKGROUND")
 	texture:ClearAllPoints()
 	texture:SetTexture(file)
-	texture:SetVertexColor(r, g, b)
+	-- Reset everything a previous user may have changed: a pooled texture keeps
+	-- its alpha otherwise (a faded divider came back as a faded coin icon).
+	texture:SetVertexColor(r, g, b, 1)
+	texture:SetAlpha(1)
+	texture:SetTexCoord(0, 1, 0, 1)
 	texture:Show()
   return texture
 end
