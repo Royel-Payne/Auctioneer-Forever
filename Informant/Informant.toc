@@ -8,7 +8,7 @@
 ## SavedVariables: InformantConfig, InformantLocalUpdates
 ## IconTexture: Interface/Addons/Informant/inficon.blp
 ##
-## Version: 12.x-forever.2
+## Version: 12.x-forever.3
 ## Revision: $Id$
 ## Author: Norganna's AddOns
 ## X-Part-Of: Auctioneer

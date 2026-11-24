@@ -308,6 +308,8 @@ function wow.install()
 			if not it then return end
 			return it.name, nil, it.quality, it.level, 1, nil, nil, 1, nil, 1, it.vendorPrice
 		end,
+		-- Spec item locations carry their link (an itemID here) as a plain field.
+		GetItemLink = function(loc) return type(loc) == "table" and rawget(loc, "link") or nil end,
 		GetDetailedItemLevelInfo = function(link)
 			local it = item(linkItemID(link))
 			return it and it.level
