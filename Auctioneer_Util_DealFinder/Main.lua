@@ -48,7 +48,7 @@ end
 --   vendor deal: profit = vendor price - listing price
 --   market deal: profit = usual price after the 5% auction cut - listing price
 -- "Usual price" is the median of past scans (not this one), and needs enough of them.
--- The minimum discount and profit are settings (dealsMinDiscount, dealsMinProfit),
+-- The minimum discount and profit are settings (dealsMinDiscount, dealsMinProfitCopper),
 -- applied when the list is shown, so changing them needs no new scan.
 local AUCTION_CUT = 0.05
 local MIN_PROFIT = 100        -- default for Evaluate: 1 silver
@@ -127,7 +127,7 @@ function Module:Display()
 	-- The slider sets the minimum discount below the vendor or usual price.
 	local percent = floor(resultsFrame.percent:GetValue() + 0.5) / 100
 
-	local minProfit = (Auctioneer:Setting("dealsMinProfit") or 1) * 100
+	local minProfit = Auctioneer:Setting("dealsMinProfitCopper") or 100
 	local list = {}
 	for _, deal in ipairs(self.deals) do
 		if deal[6] >= percent and deal[4] >= minProfit then

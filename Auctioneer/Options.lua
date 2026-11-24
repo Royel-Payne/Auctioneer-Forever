@@ -30,7 +30,7 @@ local function tooltip(owner, title, text)
 end
 
 -- A boxed section: gold title above, short grey description, then rows.
-local function section(parent, anchor, title, description, rows)
+local function section(parent, anchor, title, description)
 	local heading = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	heading:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -14)
 	heading:SetText(title)
@@ -54,18 +54,20 @@ local function section(parent, anchor, title, description, rows)
 	text:SetTextColor(0.7, 0.7, 0.7)
 	text:SetText(description)
 
-	box:SetHeight(BOX_PAD + 14 + 6 + rows * ROW_HEIGHT + BOX_PAD)
-	box.nextRow = 0
-	box.top = BOX_PAD + 14 + 6
+	-- Rows stack below the description; the box grows to fit them.
+	box.y = BOX_PAD + 14 + 6
+	box:SetHeight(box.y + BOX_PAD)
 	return box
 end
 
-local function rowFrame(box, indent)
+local function rowFrame(box, indent, height)
+	height = height or ROW_HEIGHT
 	local row = CreateFrame("Frame", nil, box)
-	row:SetHeight(ROW_HEIGHT)
-	row:SetPoint("TOPLEFT", box, "TOPLEFT", BOX_PAD + (indent and INDENT or 0), -(box.top + box.nextRow * ROW_HEIGHT))
+	row:SetHeight(height)
+	row:SetPoint("TOPLEFT", box, "TOPLEFT", BOX_PAD + (indent and INDENT or 0), -box.y)
 	row:SetPoint("RIGHT", box, "RIGHT", -BOX_PAD, 0)
-	box.nextRow = box.nextRow + 1
+	box.y = box.y + height
+	box:SetHeight(box.y + BOX_PAD)
 	return row
 end
 
@@ -131,12 +133,55 @@ local function slider(box, key, label, low, high, step, format, help, indent)
 	return control
 end
 
+-- Any amount of money, in Blizzard's gold / silver / copper boxes (as on the Sell tab).
+local MONEY_ROW_HEIGHT = 38
+local function money(box, key, label, help, indent)
+	local row = rowFrame(box, indent, MONEY_ROW_HEIGHT)
+	local text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	text:SetPoint("LEFT", row, "LEFT", 4, 0)
+	text:SetText(label)
+
+	local input = CreateFrame("Frame", nil, row, "LargeMoneyInputFrameTemplate")
+	input:SetSize(176, 33)
+	input:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+	local updating = false
+	input:SetOnValueChangedCallback(function()
+		if updating then return end
+		local amount = input:GetAmount()
+		if amount ~= setting(key) then
+			Auctioneer:SetSetting(key, amount)
+		end
+	end)
+	for _, editBox in ipairs({input.GoldBox, input.SilverBox, input.CopperBox}) do
+		tooltip(editBox, label, help)
+	end
+
+	local control = {row = row}
+	function control:Refresh()
+		updating = true
+		input:SetAmount(setting(key) or 0)
+		updating = false
+	end
+	function control:SetEnabled(on)
+		input:SetEnabled(on)
+		text:SetFontObject(on and "GameFontHighlight" or "GameFontDisable")
+	end
+	tinsert(controls, control)
+	return control
+end
+
 local function hours(value) return value == 1 and "1 hour" or format("%d hours", value) end
 local function percent(value) return format("%d%%", value) end
-local function silver(value) return value == 0 and "any" or format("%d silver", value) end
 
 EventUtil.ContinueOnAddOnLoaded("Auctioneer", function()
 	AuctioneerSettings = AuctioneerSettings or {}
+	-- Minimum profit used to be whole silver (dealsMinProfit); it is copper now.
+	if AuctioneerSettings.dealsMinProfit ~= nil then
+		if AuctioneerSettings.dealsMinProfitCopper == nil then
+			AuctioneerSettings.dealsMinProfitCopper = AuctioneerSettings.dealsMinProfit * 100
+		end
+		AuctioneerSettings.dealsMinProfit = nil
+	end
 
 	local panel = CreateFrame("Frame")
 	panel:Hide()
@@ -151,7 +196,7 @@ EventUtil.ContinueOnAddOnLoaded("Auctioneer", function()
 		"   |cff808080/auc opens this page|r")
 
 	local scanning = section(panel, title, "Scanning",
-		"One scan when you open the auction house and the prices are old. Never on a timer.", 3)
+		"One scan when you open the auction house and the prices are old. Never on a timer.")
 	local autoScan = checkbox(scanning, "autoScan", "Scan when the auction house opens",
 		"When you open the auction house and the last scan is old, scan it once.")
 	local announce = checkbox(scanning, "announceScan", "Announce the scan in chat",
@@ -160,16 +205,16 @@ EventUtil.ContinueOnAddOnLoaded("Auctioneer", function()
 		"How old the last full scan must be before opening the auction house scans again.", true)
 
 	local deals = section(panel, scanning, "Deal finder",
-		"Auctions listed well below what a vendor pays, or below the item's usual price.", 3)
+		"Auctions listed well below what a vendor pays, or below the item's usual price.")
 	checkbox(deals, "dealsOpenAfterScan", "Open after a scan you start",
 		"Show the Deal finder when a scan you started finishes. The automatic scan never opens it.")
 	slider(deals, "dealsMinDiscount", "Minimum discount", 5, 90, 5, percent,
 		"How far below the vendor or usual price an auction must be. The Deal finder's own slider sets the same value.")
-	slider(deals, "dealsMinProfit", "Minimum profit", 0, 50, 1, silver,
-		"Only list deals that make at least this much after the auction house cut.")
+	money(deals, "dealsMinProfitCopper", "Minimum profit",
+		"Only list deals that make at least this much after the auction house cut. Any amount: type gold, silver and copper as on the Sell tab.")
 
 	local selling = section(panel, deals, "Selling",
-		"Help on the auction house Sell tab.", 3)
+		"Help on the auction house Sell tab.")
 	checkbox(selling, "vendorCheck", "Vendor check in the Valuer",
 		"Compare the auction, after the 5% cut, with selling to a vendor.")
 	checkbox(selling, "sellSlotSwap", "Keep the old item when swapping the sell item",
