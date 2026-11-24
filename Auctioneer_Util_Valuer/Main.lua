@@ -63,15 +63,26 @@ function Module:SellItemLoaded(itemType, itemLocation)
 	self:Render(self:ActiveSellFrame())
 end
 
+-- Fonts, as in Blizzard's own sell frame: labels and headings in Friz Quadrata,
+-- money in the GUI's money view (Arial Narrow, like Blizzard's number font).
+local LABEL_FONT, LABEL_SIZE = "FRIZQT__", 11
+
 -- Money lines show copper: most of what gets posted is worth less than a silver.
 local function addMoney(lines, label, amount)
-	local line = lines:AddMoneyLine(nil, nil, nil, true)
+	local line = lines:AddMoneyLine(LABEL_SIZE, LABEL_FONT, nil, true)
 	line:Set(label, amount)
+end
+
+-- A label with a number on the right; the number uses the money column's font.
+local function addCount(lines, label, value)
+	local line = lines:AddDoubleLine(LABEL_SIZE, LABEL_FONT)
+	line.right:SetFont("Fonts\\ARIALN.TTF", 12, "OUTLINE")
+	line:Set(label, value)
 end
 
 -- Section title in Blizzard's gold heading colour.
 local function addHeader(lines, text)
-	lines:AddSingleLine():Set("|cffffd100"..text.."|r")
+	lines:AddSingleLine(LABEL_SIZE, "LEFT", LABEL_FONT):Set("|cffffd100"..text.."|r")
 end
 
 -- A thin gold rule between sections, with a little space either side.
@@ -101,12 +112,11 @@ function Module:Render(sellFrame)
 	lines:Free()
 
 	-- Add lines.
-	local line = lines:AddSingleLine(14, "CENTER")
+	local line = lines:AddSingleLine(13, "CENTER", LABEL_FONT)
 	line:Set("|c"..info.color..info.name.."|r")
 
 	local id = item:ID()
-	line = lines:AddDoubleLine()
-	line:Set("|cff808080Auctioneer StatID|r", "|cff808080"..id.."|r")
+	addCount(lines, "|cff808080Auctioneer StatID|r", "|cff808080"..id.."|r")
 
 	local stats = Auctioneer:Statistics(id)
 	for _, stat in ipairs(stats) do
@@ -131,8 +141,7 @@ function Module:Render(sellFrame)
 			addMoney(lines, " - 10th percentile", pct)
 		end
 
-		line = lines:AddDoubleLine()
-		line:Set(" - data points", "x"..number)
+		addCount(lines, " - data points", "x"..number)
 	end
 
 	self:AddVendorCheck(lines, sellFrame)
@@ -209,7 +218,7 @@ function Module:AddVendorCheck(lines, sellFrame)
 	addDivider(lines)
 	if vendorPrice == 0 then
 		addHeader(lines, "Vendor check")
-		lines:AddSingleLine():Set(" - vendors won't buy this item")
+		lines:AddSingleLine(LABEL_SIZE, "LEFT", LABEL_FONT):Set(" - vendors won't buy this item")
 		return
 	end
 
@@ -225,7 +234,7 @@ function Module:AddVendorCheck(lines, sellFrame)
 
 	if price > 0 then
 		lines:AddSingleLine(4)
-		local verdict = lines:AddSingleLine(12, "CENTER")
+		local verdict = lines:AddSingleLine(LABEL_SIZE + 1, "CENTER", LABEL_FONT)
 		if n.auction > n.vendor then
 			verdict:Set(GREEN_FONT_COLOR:WrapTextInColorCode(
 				"Post it: auction pays "..money(n.auction - n.vendor).." more"))
