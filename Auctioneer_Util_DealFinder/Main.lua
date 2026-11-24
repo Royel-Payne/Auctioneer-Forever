@@ -43,6 +43,49 @@ function Module:DisplayModeChanged(displayMode)
 	end
 end
 
+-- What counts as a deal. A listing is a deal when it is well below what a vendor
+-- pays, or well below what the item usually sells for, and buying it makes real money:
+--   vendor deal: profit = vendor price - listing price
+--   market deal: profit = usual price after the 5% auction cut - listing price
+-- "Usual price" is the median of past scans (not this one), and needs enough of them.
+local AUCTION_CUT = 0.05
+local MIN_PROFIT = 100        -- 1 silver: below this a "deal" is noise
+local MIN_DATA_POINTS = 6     -- scans of an item before its usual price is trusted
+local DEFAULT_DISCOUNT = 25   -- slider default, percent below vendor or usual price
+
+-- Usual price of an item: the median of the statistic with the most data points.
+local function usualPrice(stats, options)
+	local price, points
+	for _, stat in ipairs(stats) do
+		local n = stat:Number()
+		local median = stat:Percentile(50, options)
+		if median and n and n >= MIN_DATA_POINTS and (not points or n > points) then
+			price, points = median, n
+		end
+	end
+	return price, points
+end
+
+-- The deal a listing offers, or nil. Returns kind, profit, discount (0-1), points.
+function Module.Evaluate(itemPrice, vendorPrice, usual, points)
+	local best
+	if vendorPrice and vendorPrice > 0 then
+		local profit = vendorPrice - itemPrice
+		if profit >= MIN_PROFIT then
+			best = {"vendor", profit, profit / vendorPrice, 0}
+		end
+	end
+	if usual and usual > 0 then
+		local profit = math.floor(usual * (1 - AUCTION_CUT)) - itemPrice
+		if profit >= MIN_PROFIT and (not best or profit > best[2]) then
+			best = {"arbitrage", profit, (usual - itemPrice) / usual, points}
+		end
+	end
+	if best then
+		return unpack(best)
+	end
+end
+
 -- This is where we spring into action to find some deals
 function Module:ScannerItemsCompleted(items)
 	local deals = {}
@@ -50,42 +93,16 @@ function Module:ScannerItemsCompleted(items)
 		weighted = true,
 		before = Auctioneer.Timeslice() - 1,
 	}
-	for pos, item in ipairs(items) do
-		local stats = Auctioneer:Statistics(item.id)
-		local bestPrice, bestPricePoints, bestSpark
-
-		for _, stat in ipairs(stats) do
-			-- Get the 15th percentile if we can, else use the minimum.
-			local dataPoints = stat:Number()
-			local price = stat:Percentile(15, options)
-			if not price then
-				price = stat:Minimum()
-			end
-
-			if price and (not bestPrice or (price < bestPrice and dataPoints > 5 and dataPoints > bestPricePoints / 2)) then
-				bestPrice = price
-				bestPricePoints = dataPoints
-
-				if stat.spark then
-					bestSpark = stat.spark
-				end
-			elseif not bestSpark then
-				bestSpark = stat.spark
-			end
-		end
-
+	for _, item in ipairs(items) do
+		local usual, points = usualPrice(Auctioneer:Statistics(item.id), options)
 		local itemPrice = item.itemData.minPrice
-		local vendorPrice = item:VendorPrice()
-
-		if vendorPrice and vendorPrice > 0 and itemPrice < vendorPrice then
-			tinsert(deals, {item, itemPrice, "vendor", vendorPrice, 0})
-		elseif bestPrice and bestPricePoints > 5 then
-			local margin = bestPrice - itemPrice
-			if margin / itemPrice >= -1 then
-				tinsert(deals, {item, itemPrice, "arbitrage", margin, bestPricePoints, bestSpark})
-			end
+		local kind, profit, discount, dataPoints = Module.Evaluate(itemPrice, item:VendorPrice(), usual, points)
+		if kind then
+			-- item, price, kind, profit, data points, discount
+			tinsert(deals, {item, itemPrice, kind, profit, dataPoints, discount})
 		end
 	end
+	table.sort(deals, function(a, b) return a[4] > b[4] end)
 	self.deals = deals
 
 	resultsFrame.scroll:SetValue(1)
@@ -98,17 +115,13 @@ function Module:Display()
 		return
 	end
 
+	-- The slider sets the minimum discount below the vendor or usual price.
 	local percent = floor(resultsFrame.percent:GetValue() + 0.5) / 100
 
 	local list = {}
 	for _, deal in ipairs(self.deals) do
-		if deal[3] == "vendor" then
+		if deal[6] >= percent then
 			tinsert(list, deal)
-		elseif deal[3] == "arbitrage" then
-			markdown = deal[4] / deal[2]
-			if markdown > percent then
-				tinsert(list, deal)
-			end
 		end
 	end
 
@@ -128,7 +141,7 @@ function Module:Display()
 	end
 
 	local offset = floor(resultsFrame.scroll:GetValue() + 0.5) -1
-	resultsFrame.percentText:SetText(floor(percent*100).."%")
+	resultsFrame.percentText:SetText(floor(percent*100).."% off or more")
 
 	local lines = {}
 	for i = 1,35 do
@@ -138,7 +151,7 @@ function Module:Display()
 		line:Reset()
 
 		if deal then
-			local item, itemPrice, dealType, margin, points, spark = unpack(deal)
+			local item, itemPrice, dealType, margin = unpack(deal)
 			local name, link, color
 
 			local info = item:Info()
@@ -224,8 +237,9 @@ function Module:CreateResults()
 	percent:SetPoint("TOPLEFT", inset, "BOTTOMLEFT", 10, -3)
 	percent:SetHeight(20)
 	percent:SetWidth(210)
-	percent:SetMinMaxValues(-100, 500)
-	percent:SetValue(5)
+	percent:SetMinMaxValues(5, 90)
+	percent:SetValueStep(5)
+	percent:SetValue(DEFAULT_DISCOUNT)
 	percent:SetScript("OnValueChanged", redisplay)
 	percent:SetScript("OnMouseWheel", wheelValue(percent))
 	resultsFrame.percent = percent
@@ -239,7 +253,7 @@ function Module:CreateResults()
 	percentText:SetPoint("LEFT", percent, "RIGHT", 3, 0)
 	percentText:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
 	percentText:SetJustifyH("LEFT")
-	percentText:SetText("5%")
+	percentText:SetText(DEFAULT_DISCOUNT.."% off or more")
 	resultsFrame.percentText = percentText
 
 	local function lineReset(self)
