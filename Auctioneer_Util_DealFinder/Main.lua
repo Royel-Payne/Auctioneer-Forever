@@ -141,7 +141,7 @@ function Module:Display()
 	end
 
 	local offset = floor(resultsFrame.scroll:GetValue() + 0.5) -1
-	resultsFrame.percentText:SetText(floor(percent*100).."% off or more")
+	resultsFrame.percentText:SetText(floor(percent*100).."%")
 
 	local lines = {}
 	for i = 1,35 do
@@ -232,16 +232,21 @@ function Module:CreateResults()
 	_G[scrollName.."Text"]:SetText("")
 	resultsFrame.scroll = scroll
 
+	-- Minimum discount: gold label, slider with a gold fill up to the thumb, value.
+	local percentLabel = resultsFrame:CreateFontString(nil, "OVERLAY")
+	percentLabel:SetPoint("TOPLEFT", inset, "BOTTOMLEFT", 8, -7)
+	percentLabel:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
+	percentLabel:SetTextColor(1, 0.82, 0)
+	percentLabel:SetText("Minimum discount")
+
 	local percent = CreateFrame("Slider", "AuctioneerDealFinderPercent", inset, "OptionsSliderTemplate")
 	percent:SetOrientation("HORIZONTAL")
-	percent:SetPoint("TOPLEFT", inset, "BOTTOMLEFT", 10, -3)
+	percent:SetPoint("LEFT", percentLabel, "RIGHT", 10, 0)
 	percent:SetHeight(20)
-	percent:SetWidth(210)
+	percent:SetWidth(200)
 	percent:SetMinMaxValues(5, 90)
 	percent:SetValueStep(5)
-	percent:SetValue(DEFAULT_DISCOUNT)
-	percent:SetScript("OnValueChanged", redisplay)
-	percent:SetScript("OnMouseWheel", wheelValue(percent))
+	percent:SetObeyStepOnDrag(true)
 	resultsFrame.percent = percent
 
 	scrollName = percent:GetName()
@@ -249,12 +254,46 @@ function Module:CreateResults()
 	_G[scrollName.."High"]:SetText("")
 	_G[scrollName.."Text"]:SetText("")
 
+	-- Track fill from the left end to the thumb, so the setting reads at a glance.
+	local FILL_INSET = 6
+	local fill = percent:CreateTexture(nil, "ARTWORK")
+	fill:SetTexture("Interface\\Buttons\\WHITE8X8")
+	fill:SetVertexColor(1, 0.82, 0, 0.75)
+	fill:SetHeight(4)
+	fill:SetPoint("LEFT", percent, "LEFT", FILL_INSET, 0)
+	local function updateFill()
+		local low, high = percent:GetMinMaxValues()
+		local share = (percent:GetValue() - low) / (high - low)
+		fill:SetWidth(math.max(1, (percent:GetWidth() - 2 * FILL_INSET) * share))
+	end
+
 	local percentText = resultsFrame:CreateFontString(nil, "OVERLAY")
-	percentText:SetPoint("LEFT", percent, "RIGHT", 3, 0)
+	percentText:SetPoint("LEFT", percent, "RIGHT", 8, 0)
 	percentText:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
 	percentText:SetJustifyH("LEFT")
-	percentText:SetText(DEFAULT_DISCOUNT.."% off or more")
 	resultsFrame.percentText = percentText
+
+	percent:SetScript("OnValueChanged", function()
+		updateFill()
+		redisplay()
+	end)
+	percent:SetScript("OnMouseWheel", function(slider, delta)
+		local low, high = slider:GetMinMaxValues()
+		slider:SetValue(math.min(high, math.max(low, slider:GetValue() + delta * 5)))
+	end)
+	percent:SetScript("OnEnter", function(slider)
+		GameTooltip:SetOwner(slider, "ANCHOR_TOP")
+		GameTooltip:SetText("Minimum discount")
+		GameTooltip:AddLine(format("Show listings at least %d%% below what a vendor pays, or below the item's usual auction price.",
+			floor(slider:GetValue() + 0.5)), 1, 1, 1, true)
+		GameTooltip:AddLine("Drag or use the mouse wheel.", 0.6, 0.6, 0.6, true)
+		GameTooltip:Show()
+	end)
+	percent:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+	percent:SetValue(DEFAULT_DISCOUNT)
+	percentText:SetText(DEFAULT_DISCOUNT.."%")
+	updateFill()
 
 	local function lineReset(self)
 		self.item = nil
