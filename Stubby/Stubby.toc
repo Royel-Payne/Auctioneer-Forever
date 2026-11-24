@@ -5,7 +5,7 @@
 ## OptionalDeps: !nLog, DebugLib
 ## SavedVariables: StubbyConfig
 ##
-## Version: 12.x-forever.3
+## Version: 12.x-forever.4
 ## Revision: $Id$
 ## Author: Norganna's AddOns
 ## X-Part-Of: Libraries
