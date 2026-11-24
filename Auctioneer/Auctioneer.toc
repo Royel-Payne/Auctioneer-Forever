@@ -5,10 +5,10 @@
 ## LoadOnDemand: 0
 ## Dependencies: Stubby
 ## OptionalDependencies: !nLog, SlideBar, Configator, Babylonian, DebugLib, TipHelper, LibExtraTip, LibDataBroker
-## SavedVariables: AuctioneerConfig, AuctioneerData, AuctioneerServers, AuctioneerLog
+## SavedVariables: AuctioneerConfig, AuctioneerData, AuctioneerServers, AuctioneerLog, AuctioneerSettings
 ## SavedVariablesPerCharacter: AuctioneerLocal
 ##
-## Version: 12.x-forever.12
+## Version: 12.x-forever.13
 ## Revision: $Id$
 ## Author: Norganna's AddOns
 ## X-Part-Of: Auctioneer
@@ -37,3 +37,6 @@ Register.lua
 
 ## Load up any of our active modules now.
 Modules\Active.xml
+
+## The settings page in Options > AddOns.
+Options.lua

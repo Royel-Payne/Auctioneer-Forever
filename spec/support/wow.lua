@@ -235,6 +235,7 @@ function wow.install()
 
 	_G.Auctioneer = nil
 	_G.AuctioneerData = nil
+	_G.AuctioneerSettings = nil
 	_G.AuctioneerLocal = nil
 	_G.AuctioneerLog = nil
 	_G.AuctioneerStatsOverTimeData = nil

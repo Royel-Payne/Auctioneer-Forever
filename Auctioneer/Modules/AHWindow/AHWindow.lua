@@ -23,6 +23,9 @@ end
 -- A post-hook (hooksecurefunc) only clears the cursor afterwards, so Blizzard's
 -- own code runs untouched and nothing it later reads is tainted.
 local function KeepOldItemInBag(itemDisplay)
+	if not Auctioneer:Setting("sellSlotSwap") then
+		return
+	end
 	local cursorItem = C_Cursor.GetCursorItem()
 	local slotItem = itemDisplay:GetItemLocation()
 	if cursorItem and slotItem and not cursorItem:IsEqualTo(slotItem) then

@@ -166,6 +166,9 @@ function private:Booted()
 	Auctioneer.VariantKeys = parts.Internal.VariantKeys
 	Auctioneer.VariantFromLink = parts.Internal.VariantFromLink
 	Auctioneer.Ago = parts.Internal.Ago
+	Auctioneer.Setting = parts.Internal.Setting
+	Auctioneer.SetSetting = parts.Internal.SetSetting
+	Auctioneer.settingDefaults = parts.Internal.settingDefaults
 	Auctioneer.ItemKeyKey = parts.Internal.ItemKeyKey
 	Auctioneer.ItemKeyString = parts.Internal.ItemKeyString
 	Auctioneer.ItemKeyFromLink = parts.Internal.ItemKeyFromLink

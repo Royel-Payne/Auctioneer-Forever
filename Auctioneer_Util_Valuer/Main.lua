@@ -83,8 +83,7 @@ local function addCount(lines, label, value)
 end
 
 -- When an item was last seen at auction: hours since its newest data point.
--- Older than this and the price history is shown as stale (orange).
-local STALE_HOURS = 6
+-- Older than the staleHours setting and the price history is shown as stale (orange).
 function Module.HoursSinceSeen(stat, now)
 	local newest
 	for _, point in ipairs(stat.points or {}) do
@@ -161,7 +160,7 @@ function Module:Render(sellFrame)
 		local hours = Module.HoursSinceSeen(stat, Auctioneer:Timeslice())
 		if hours then
 			local text = hours < 1 and "this hour" or Auctioneer:Ago(hours * 3600)
-			if hours >= STALE_HOURS then
+			if hours >= Auctioneer:Setting("staleHours") then
 				text = "|cffff9933"..text.."|r"
 			end
 			addCount(lines, " - last seen", text)
@@ -228,6 +227,9 @@ local function askingPrice(sellFrame)
 end
 
 function Module:AddVendorCheck(lines, sellFrame)
+	if not Auctioneer:Setting("vendorCheck") then
+		return
+	end
 	local itemLocation = sellFrame and sellFrame:GetItem()
 	if not itemLocation or not itemLocation:IsValid() then
 		return

@@ -41,9 +41,11 @@ end
 
 -- A full scan is a browse with an empty search box, no category, no level range
 -- and Blizzard's default filters. Opening the auction house starts one when the
--- last full scan is older than this. One scan per visit, because you opened it:
--- Auctioneer never searches on a timer.
-local SCAN_STALE_SECONDS = 3600
+-- last full scan is older than the autoScanHours setting (at least an hour). One
+-- scan per visit, because you opened it: Auctioneer never searches on a timer.
+local function staleSeconds()
+	return math.max(1, Auctioneer:Setting("autoScanHours") or 1) * 3600
+end
 
 -- Blizzard's default browse filters, as the array a query carries.
 local function defaultFilters()
@@ -99,6 +101,9 @@ end
 -- Start a full scan if the prices are stale. Retries a few times while the
 -- auction house throttle is busy.
 function Module:AutoScan(tries)
+	if not Auctioneer:Setting("autoScan") then
+		return
+	end
 	if not (AuctionHouseFrame and AuctionHouseFrame:IsShown()) or self.scanning then
 		return
 	end
@@ -106,7 +111,7 @@ function Module:AutoScan(tries)
 		return
 	end
 	local age = self:ScanAge()
-	if age and age < SCAN_STALE_SECONDS then
+	if age and age < staleSeconds() then
 		return
 	end
 	if not C_AuctionHouse.IsThrottledMessageSystemReady() then
@@ -115,10 +120,12 @@ function Module:AutoScan(tries)
 		end
 		return
 	end
-	if age then
-		print(format("|cffffd100Auctioneer:|r last scan was %s, scanning the auction house.", Auctioneer:Ago(age)))
-	else
-		print("|cffffd100Auctioneer:|r no scan yet, scanning the auction house.")
+	if Auctioneer:Setting("announceScan") then
+		if age then
+			print(format("|cffffd100Auctioneer:|r last scan was %s, scanning the auction house.", Auctioneer:Ago(age)))
+		else
+			print("|cffffd100Auctioneer:|r no scan yet, scanning the auction house.")
+		end
 	end
 	Module.autoQueryPending = true
 	C_AuctionHouse.SendBrowseQuery({

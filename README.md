@@ -38,6 +38,10 @@ To update, do the same with a newer zip.
   simply stays in your bags.
 - The auction house window can be dragged around.
 
+**Settings:** *Options > AddOns > Auctioneer*, or type `/auc`. Turn the scan on opening
+on or off and choose how old prices must be first (1 to 24 hours), set the Deal finder's
+minimum discount and profit, and switch the vendor check and the sell-slot swap on or off.
+
 Don't care about disenchanting? Untick **Enchantrix** in the AddOns list. Keep `Stubby`,
 `SlideBar` and `!Swatter` on: the others need them.
 

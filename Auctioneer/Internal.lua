@@ -122,6 +122,34 @@ function Internal:Log(fmt, ...)
 	end
 end
 
+-- Player settings, saved in AuctioneerSettings and edited in Options > AddOns >
+-- Auctioneer (Options.lua). Read them with Auctioneer:Setting(key): a key the
+-- player never changed gives its default.
+Internal.settingDefaults = {
+	autoScan = true,           -- scan when the auction house opens and prices are stale
+	autoScanHours = 1,         -- how old the last scan must be first (1-24)
+	announceScan = true,       -- say so in chat
+	dealsOpenAfterScan = true, -- open the Deal finder after a scan you start
+	dealsMinDiscount = 25,     -- percent below vendor or usual price (5-90)
+	dealsMinProfit = 1,        -- silver (0-50)
+	sellSlotSwap = true,       -- a new sell item leaves the old one in the bags
+	vendorCheck = true,        -- vendor check in the Valuer
+	staleHours = 6,            -- price history older than this shows orange (1-48)
+}
+
+function Internal:Setting(key)
+	local saved = AuctioneerSettings and AuctioneerSettings[key]
+	if saved == nil then
+		return Internal.settingDefaults[key]
+	end
+	return saved
+end
+
+function Internal:SetSetting(key, value)
+	AuctioneerSettings = AuctioneerSettings or {}
+	AuctioneerSettings[key] = value
+end
+
 -- "12 min ago", "3 h ago", "2 days ago" for an age in seconds.
 function Internal:Ago(seconds)
 	seconds = math.max(0, seconds or 0)

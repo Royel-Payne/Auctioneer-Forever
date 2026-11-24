@@ -48,10 +48,11 @@ end
 --   vendor deal: profit = vendor price - listing price
 --   market deal: profit = usual price after the 5% auction cut - listing price
 -- "Usual price" is the median of past scans (not this one), and needs enough of them.
+-- The minimum discount and profit are settings (dealsMinDiscount, dealsMinProfit),
+-- applied when the list is shown, so changing them needs no new scan.
 local AUCTION_CUT = 0.05
-local MIN_PROFIT = 100        -- 1 silver: below this a "deal" is noise
+local MIN_PROFIT = 100        -- default for Evaluate: 1 silver
 local MIN_DATA_POINTS = 6     -- scans of an item before its usual price is trusted
-local DEFAULT_DISCOUNT = 25   -- slider default, percent below vendor or usual price
 
 -- Usual price of an item: the median of the statistic with the most data points.
 local function usualPrice(stats, options)
@@ -67,17 +68,19 @@ local function usualPrice(stats, options)
 end
 
 -- The deal a listing offers, or nil. Returns kind, profit, discount (0-1), points.
-function Module.Evaluate(itemPrice, vendorPrice, usual, points)
+-- minProfit in copper, default 1 silver.
+function Module.Evaluate(itemPrice, vendorPrice, usual, points, minProfit)
+	minProfit = math.max(1, minProfit or MIN_PROFIT)
 	local best
 	if vendorPrice and vendorPrice > 0 then
 		local profit = vendorPrice - itemPrice
-		if profit >= MIN_PROFIT then
+		if profit >= minProfit then
 			best = {"vendor", profit, profit / vendorPrice, 0}
 		end
 	end
 	if usual and usual > 0 then
 		local profit = math.floor(usual * (1 - AUCTION_CUT)) - itemPrice
-		if profit >= MIN_PROFIT and (not best or profit > best[2]) then
+		if profit >= minProfit and (not best or profit > best[2]) then
 			best = {"arbitrage", profit, (usual - itemPrice) / usual, points}
 		end
 	end
@@ -98,7 +101,8 @@ function Module:ScannerItemsCompleted(items, auto)
 	for _, item in ipairs(items) do
 		local usual, points = usualPrice(Auctioneer:Statistics(item.id), options)
 		local itemPrice = item.itemData.minPrice
-		local kind, profit, discount, dataPoints = Module.Evaluate(itemPrice, item:VendorPrice(), usual, points)
+		-- Keep every profitable listing; Display applies the minimum profit setting.
+		local kind, profit, discount, dataPoints = Module.Evaluate(itemPrice, item:VendorPrice(), usual, points, 1)
 		if kind then
 			-- item, price, kind, profit, data points, discount
 			tinsert(deals, {item, itemPrice, kind, profit, dataPoints, discount})
@@ -107,7 +111,7 @@ function Module:ScannerItemsCompleted(items, auto)
 	table.sort(deals, function(a, b) return a[4] > b[4] end)
 	self.deals = deals
 
-	if auto and not resultsFrame:IsShown() then
+	if (auto or not Auctioneer:Setting("dealsOpenAfterScan")) and not resultsFrame:IsShown() then
 		return
 	end
 	resultsFrame.scroll:SetValue(1)
@@ -123,9 +127,10 @@ function Module:Display()
 	-- The slider sets the minimum discount below the vendor or usual price.
 	local percent = floor(resultsFrame.percent:GetValue() + 0.5) / 100
 
+	local minProfit = (Auctioneer:Setting("dealsMinProfit") or 1) * 100
 	local list = {}
 	for _, deal in ipairs(self.deals) do
-		if deal[6] >= percent then
+		if deal[6] >= percent and deal[4] >= minProfit then
 			tinsert(list, deal)
 		end
 	end
@@ -278,9 +283,21 @@ function Module:CreateResults()
 	percentText:SetJustifyH("LEFT")
 	resultsFrame.percentText = percentText
 
-	percent:SetScript("OnValueChanged", function()
+	percent:SetScript("OnValueChanged", function(slider)
 		updateFill()
+		local value = floor(slider:GetValue() + 0.5)
+		percentText:SetText(value.."%")
+		if value ~= Auctioneer:Setting("dealsMinDiscount") then
+			Auctioneer:SetSetting("dealsMinDiscount", value)
+		end
 		redisplay()
+	end)
+	-- The settings page changes the same value: pick it up whenever the panel shows.
+	resultsFrame:HookScript("OnShow", function()
+		local value = Auctioneer:Setting("dealsMinDiscount")
+		if floor(percent:GetValue() + 0.5) ~= value then
+			percent:SetValue(value)
+		end
 	end)
 	percent:SetScript("OnMouseWheel", function(slider, delta)
 		local low, high = slider:GetMinMaxValues()
@@ -296,8 +313,9 @@ function Module:CreateResults()
 	end)
 	percent:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-	percent:SetValue(DEFAULT_DISCOUNT)
-	percentText:SetText(DEFAULT_DISCOUNT.."%")
+	local discount = Auctioneer:Setting("dealsMinDiscount")
+	percent:SetValue(discount)
+	percentText:SetText(discount.."%")
 	updateFill()
 
 	local function lineReset(self)
