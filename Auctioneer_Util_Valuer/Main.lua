@@ -69,6 +69,24 @@ local function addMoney(lines, label, amount)
 	line:Set(label, amount)
 end
 
+-- Section title in Blizzard's gold heading colour.
+local function addHeader(lines, text)
+	lines:AddSingleLine():Set("|cffffd100"..text.."|r")
+end
+
+-- A thin gold rule between sections, with a little space either side.
+local function addDivider(lines)
+	local line = lines:AddSingleLine(6)
+	local frame = line:Frame()
+	local rule = lines:Texture("Interface\\Buttons\\WHITE8X8")
+	rule:SetParent(frame)
+	rule:SetPoint("LEFT", frame, "LEFT", 0, 0)
+	rule:SetPoint("RIGHT", frame, "RIGHT", 0, 0)
+	rule:SetHeight(1)
+	rule:SetVertexColor(1, 0.82, 0, 0.35)
+	frame:Add(rule)
+end
+
 -- Draw the panel: item, price statistics, then the vendor check for the sell frame.
 function Module:Render(sellFrame)
 	local current = self.current
@@ -88,12 +106,12 @@ function Module:Render(sellFrame)
 
 	local id = item:ID()
 	line = lines:AddDoubleLine()
-	line:Set("Auctioneer StatID", id)
+	line:Set("|cff808080Auctioneer StatID|r", "|cff808080"..id.."|r")
 
 	local stats = Auctioneer:Statistics(id)
 	for _, stat in ipairs(stats) do
-		line = lines:AddSingleLine()
-		line:Set(format("%s statistics:", stat.name))
+		addDivider(lines)
+		addHeader(lines, format("%s statistics", stat.name))
 
 		local best, number, method = stat:Best()
 		addMoney(lines, format(" - %s", method), best)
@@ -188,9 +206,9 @@ function Module:AddVendorCheck(lines, sellFrame)
 		return
 	end
 
-	lines:AddSingleLine(4) -- gap after the statistics
+	addDivider(lines)
 	if vendorPrice == 0 then
-		lines:AddSingleLine():Set("Vendor check:")
+		addHeader(lines, "Vendor check")
 		lines:AddSingleLine():Set(" - vendors won't buy this item")
 		return
 	end
@@ -199,7 +217,7 @@ function Module:AddVendorCheck(lines, sellFrame)
 	local price = askingPrice(sellFrame)
 	local n = Module.VendorNumbers(vendorPrice, price, quantity)
 
-	lines:AddSingleLine():Set(quantity > 1 and format("Vendor check (x%d):", quantity) or "Vendor check:")
+	addHeader(lines, quantity > 1 and format("Vendor check (x%d)", quantity) or "Vendor check")
 	addMoney(lines, " - vendor pays", n.vendor)
 	addMoney(lines, " - auction pays, after 5% cut", n.auction)
 	addMoney(lines, " - deposit, lost if unsold", sellFrame:GetDepositAmount() or 0)
@@ -207,7 +225,7 @@ function Module:AddVendorCheck(lines, sellFrame)
 
 	if price > 0 then
 		lines:AddSingleLine(4)
-		local verdict = lines:AddSingleLine(13, "CENTER")
+		local verdict = lines:AddSingleLine(12, "CENTER")
 		if n.auction > n.vendor then
 			verdict:Set(GREEN_FONT_COLOR:WrapTextInColorCode(
 				"Post it: auction pays "..money(n.auction - n.vendor).." more"))

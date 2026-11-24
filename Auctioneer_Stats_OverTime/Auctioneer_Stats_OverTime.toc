@@ -7,7 +7,7 @@
 ## OptionalDependencies: !nLog, SlideBar, Configator, Babylonian, DebugLib, TipHelper, LibExtraTip, LibDataBroker
 ## SavedVariables: AuctioneerStatsOverTimeData
 ##
-## Version: 12.x-forever.5
+## Version: 12.x-forever.6
 ## Revision: $Id$
 ## Author: Norganna's AddOns
 ## X-Part-Of: Auctioneer
