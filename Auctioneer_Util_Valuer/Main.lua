@@ -59,6 +59,22 @@ function Module:SellItemLoaded(itemType, itemLocation)
 		self.waitingInfo = {itemID = itemKey.itemID, itemType = itemType, itemLocation = itemLocation}
 	end
 
+	self.current = {item = item, info = info}
+	self:Render(self:ActiveSellFrame())
+end
+
+-- Money lines show copper: most of what gets posted is worth less than a silver.
+local function addMoney(lines, label, amount)
+	local line = lines:AddMoneyLine(nil, nil, nil, true)
+	line:Set(label, amount)
+end
+
+-- Draw the panel: item, price statistics, then the vendor check for the sell frame.
+function Module:Render(sellFrame)
+	local current = self.current
+	if not current then return end
+	local item, info = current.item, current.info
+
 	local detail = valuerFrame.detail
 	self:ShowFrame(detail)
 
@@ -79,33 +95,29 @@ function Module:SellItemLoaded(itemType, itemLocation)
 		line = lines:AddSingleLine()
 		line:Set(format("%s statistics:", stat.name))
 
-		line = lines:AddMoneyLine()
 		local best, number, method = stat:Best()
-		line:Set(format(" - %s", method), best)
+		addMoney(lines, format(" - %s", method), best)
 
 		local min, exact = stat:Minimum()
 		if exact and min == exact and method ~= "minimum" then
-			line = lines:AddMoneyLine()
-			line:Set(" - minimum", min)
+			addMoney(lines, " - minimum", min)
 		end
 
 		local max, exact = stat:Maximum()
 		if exact and max == exact and method ~= "maximum" then
-			line = lines:AddMoneyLine()
-			line:Set(" - maximum", max)
+			addMoney(lines, " - maximum", max)
 		end
 
 		local pct = stat:Percentile(10)
 		if pct then
-			line = lines:AddMoneyLine()
-			line:Set(" - 10th percentile", pct)
+			addMoney(lines, " - 10th percentile", pct)
 		end
 
 		line = lines:AddDoubleLine()
 		line:Set(" - data points", "x"..number)
 	end
 
-	self:UpdateVendorCheck(self:ActiveSellFrame())
+	self:AddVendorCheck(lines, sellFrame)
 end
 
 -- Vendor check: does posting at the asking price beat selling to a vendor?
@@ -148,7 +160,7 @@ function Module:HookSellFrames()
 			frame.AuctioneerVendorHooked = true
 			hooksecurefunc(frame, "UpdatePostState", function(sellFrame)
 				if valuerFrame:IsShown() and sellFrame:IsShown() then
-					Module:UpdateVendorCheck(sellFrame)
+					Module:Render(sellFrame)
 				end
 			end)
 		end
@@ -164,57 +176,46 @@ local function askingPrice(sellFrame)
 	return buyout or bid or 0
 end
 
-function Module:UpdateVendorCheck(sellFrame)
-	local box = valuerFrame.vendor
+function Module:AddVendorCheck(lines, sellFrame)
 	local itemLocation = sellFrame and sellFrame:GetItem()
 	if not itemLocation or not itemLocation:IsValid() then
-		box:Hide()
 		return
 	end
 
 	local link = C_Item.GetItemLink(itemLocation)
 	local vendorPrice = link and select(11, C_Item.GetItemInfo(link))
 	if not vendorPrice then
-		box:Hide()
 		return
 	end
 
-	local labels, amounts = {}, {}
-	local function add(label, amount)
-		tinsert(labels, label)
-		tinsert(amounts, amount or "")
+	lines:AddSingleLine(4) -- gap after the statistics
+	if vendorPrice == 0 then
+		lines:AddSingleLine():Set("Vendor check:")
+		lines:AddSingleLine():Set(" - vendors won't buy this item")
+		return
 	end
 
-	if vendorPrice == 0 then
-		add("Vendor check:")
-		add("  Vendors won't buy this item")
-		box.verdict:SetText("")
-	else
-		local quantity = math.max(sellFrame:GetQuantity() or 1, 1)
-		local price = askingPrice(sellFrame)
-		local n = Module.VendorNumbers(vendorPrice, price, quantity)
-		local vendorTotal, auctionTotal = n.vendor, n.auction
+	local quantity = math.max(sellFrame:GetQuantity() or 1, 1)
+	local price = askingPrice(sellFrame)
+	local n = Module.VendorNumbers(vendorPrice, price, quantity)
 
-		add(quantity > 1 and format("Vendor check (x%d):", quantity) or "Vendor check:")
-		add("  Vendor pays", money(vendorTotal))
-		add("  Auction pays after 5% cut", money(auctionTotal))
-		add("  Deposit, lost if unsold", money(sellFrame:GetDepositAmount() or 0))
-		add("  Beats vendor at", money(n.breakEven).." each")
+	lines:AddSingleLine():Set(quantity > 1 and format("Vendor check (x%d):", quantity) or "Vendor check:")
+	addMoney(lines, " - vendor pays", n.vendor)
+	addMoney(lines, " - auction pays, after 5% cut", n.auction)
+	addMoney(lines, " - deposit, lost if unsold", sellFrame:GetDepositAmount() or 0)
+	addMoney(lines, " - beats vendor at, per item", n.breakEven)
 
-		if price == 0 then
-			box.verdict:SetText("")
-		elseif auctionTotal > vendorTotal then
-			box.verdict:SetText(GREEN_FONT_COLOR:WrapTextInColorCode(
-				"Auction pays "..money(auctionTotal - vendorTotal).." more if it sells"))
+	if price > 0 then
+		lines:AddSingleLine(4)
+		local verdict = lines:AddSingleLine(13, "CENTER")
+		if n.auction > n.vendor then
+			verdict:Set(GREEN_FONT_COLOR:WrapTextInColorCode(
+				"Post it: auction pays "..money(n.auction - n.vendor).." more"))
 		else
-			box.verdict:SetText(RED_FONT_COLOR:WrapTextInColorCode(
-				"Sell to a vendor: it pays "..money(vendorTotal - auctionTotal).." more"))
+			verdict:Set(RED_FONT_COLOR:WrapTextInColorCode(
+				"Vendor it: vendor pays "..money(n.vendor - n.auction).." more"))
 		end
 	end
-
-	box.labels:SetText(table.concat(labels, "\n"))
-	box.amounts:SetText(table.concat(amounts, "\n"))
-	box:Show()
 end
 
 function Module:CreateFrame()
@@ -254,26 +255,6 @@ function Module:CreateFrame()
 	local lines = Auctioneer.GUI:Lines(detail)
 	detail.lines = lines
 
-	-- Vendor check box, along the bottom of the panel.
-	local vendor = CreateFrame("Frame", nil, detail)
-	vendor:SetPoint("BOTTOMLEFT", detail, "BOTTOMLEFT", 0, 0)
-	vendor:SetPoint("BOTTOMRIGHT", detail, "BOTTOMRIGHT", 0, 0)
-	vendor:SetHeight(110)
-	vendor.verdict = vendor:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	vendor.verdict:SetPoint("BOTTOMLEFT", vendor, "BOTTOMLEFT", 0, 2)
-	vendor.verdict:SetPoint("BOTTOMRIGHT", vendor, "BOTTOMRIGHT", 0, 2)
-	vendor.verdict:SetJustifyH("LEFT")
-	vendor.verdict:SetWordWrap(true)
-	vendor.labels = vendor:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	vendor.labels:SetPoint("BOTTOMLEFT", vendor.verdict, "TOPLEFT", 0, 6)
-	vendor.labels:SetJustifyH("LEFT")
-	vendor.labels:SetSpacing(3)
-	vendor.amounts = vendor:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	vendor.amounts:SetPoint("BOTTOMRIGHT", vendor.verdict, "TOPRIGHT", 0, 6)
-	vendor.amounts:SetJustifyH("RIGHT")
-	vendor.amounts:SetSpacing(3)
-	vendor:Hide()
-	valuerFrame.vendor = vendor
 
 	valuerFrame:Hide()
 end
@@ -294,5 +275,6 @@ end
 
 function Module:Hide()
 	self.waitingInfo = nil
+	self.current = nil
 	valuerFrame:Hide()
 end

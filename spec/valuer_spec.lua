@@ -52,7 +52,7 @@ describe("Valuer", function()
 		end)
 
 		it("does not fail on an item without a link", function()
-			assert.has_no.errors(function() valuer:UpdateVendorCheck(nil) end)
+			assert.has_no.errors(function() valuer:Render(nil) end)
 			valuer:SellItemLoaded("SellItems", {})
 		end)
 	end)
