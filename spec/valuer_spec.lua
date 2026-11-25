@@ -4,7 +4,7 @@ describe("Valuer", function()
 	local env, A, valuer, shown
 
 	before_each(function()
-		env, A = addon.start({files = {"Auctioneer_Util_Valuer/Main.lua"}})
+		env, A = addon.start({files = {"Auctioneer_Util_Valuer/Main.lua", "Auctioneer_Util_Valuer/Exact.lua"}})
 		valuer = A.module("Util:Valuer")
 		C_AuctionHouse.GetItemKeyFromItem = function() return C_AuctionHouse.MakeItemKey(2589, 0, 0, 0) end
 		shown = 0
@@ -89,28 +89,53 @@ describe("Valuer", function()
 		end)
 	end)
 
-	describe("listing summary", function()
-		it("tells this item's listings from other variants'", function()
-			local s = valuer.ListingSummary({
-				{name = "Cloak of Shadow Protection", unitPrice = 600},
-				{name = "Cloak of the Monkey", unitPrice = 2500},
-				{name = "Cloak of Shadow Protection", unitPrice = 625},
-				{name = "Cloak of the Monkey", unitPrice = 1999},
-				{name = "Cloak of the Wolf", unitPrice = 900},
+	describe("exact matches", function()
+		it("lists only the exact item, cheapest per item first, bid-only last", function()
+			local rows = valuer.ExactRows({
+				{itemLink = wow.link(1, nil, "Cloak of the Monkey"), buyoutAmount = 2500, quantity = 1},
+				{itemLink = wow.link(1, nil, "Cloak of Spirit"), buyoutAmount = 600, quantity = 1},
+				{itemLink = wow.link(1, nil, "Cloak of the Monkey"), bidAmount = 1000, quantity = 1},
+				{itemLink = wow.link(1, nil, "Cloak of the Monkey"), buyoutAmount = 4000, quantity = 2},
 			}, "Cloak of the Monkey")
-			assert.are.equal(2, s.exact)
-			assert.are.equal(1999, s.lowest)
-			assert.are.same({1999, 2500}, s.prices)
-			assert.are.same({
-				{name = "Cloak of Shadow Protection", count = 2},
-				{name = "Cloak of the Wolf", count = 1},
-			}, s.others)
+			assert.are.equal(3, #rows)
+			assert.are.equal(2000, rows[1].buyout)
+			assert.are.equal(2500, rows[2].buyout)
+			assert.is_nil(rows[3].buyout)
+			assert.are.equal(1000, rows[3].bid)
 		end)
 
-		it("has no lowest price when none is this item", function()
-			local s = valuer.ListingSummary({{name = "Other", unitPrice = 5}}, "Mine")
-			assert.are.equal(0, s.exact)
-			assert.is_nil(s.lowest)
+		it("prices from the cheapest listing, else history, never over a typed price", function()
+			local rows = {{bid = 50}, {buyout = 1999}}
+			assert.are.same({1999, "listing"}, {valuer.ExactPrice(rows, 5000, false)})
+			assert.are.same({5000, "history"}, {valuer.ExactPrice({}, 4987, false)})
+			assert.are.same({nil, "none"}, {valuer.ExactPrice({}, nil, false)})
+			assert.are.same({nil, "typed"}, {valuer.ExactPrice(rows, 5000, true)})
+		end)
+
+		it("rounds a history price to whole silver, at least one", function()
+			assert.are.equal(500, valuer.WholeSilver(451))
+			assert.are.equal(100, valuer.WholeSilver(3))
+		end)
+
+		it("asks for the exact variant once when a suffix item is placed", function()
+			env.variantNames["6576:14310"] = "Fortified Cloak of the Monkey"
+			env.ah.infoCache["6576:14310"] = {itemName = "Fortified Cloak of the Monkey", quality = 2, iconFileID = 1}
+			A.scan({{itemID = 6576, itemLevel = 22, itemSuffix = 14310, minPrice = 2000, totalQuantity = 1}})
+			C_AuctionHouse.GetItemKeyFromItem = function() return C_AuctionHouse.MakeItemKey(6576, 22, 14310, 0) end
+			local loc = {link = wow.link(6576, nil, "Fortified Cloak of the Monkey")}
+			valuer:SellItemLoaded(AuctionHouseSearchContext.SellItems, loc)
+			valuer:SellItemLoaded(AuctionHouseSearchContext.SellItems, loc)
+			assert.are.equal(1, #env.ah.itemQueries)
+			assert.are.equal(14310, env.ah.itemQueries[1].itemKey.itemSuffix)
+		end)
+
+		it("does not search for an item without a suffix, or when turned off", function()
+			valuer:SellItemLoaded(AuctionHouseSearchContext.SellItems, {link = wow.link(2589, nil, "Linen Cloth")})
+			assert.are.equal(0, #env.ah.itemQueries)
+			_G.AuctioneerSettings = {exactMatch = false}
+			C_AuctionHouse.GetItemKeyFromItem = function() return C_AuctionHouse.MakeItemKey(6576, 22, 14310, 0) end
+			valuer:SellItemLoaded(AuctionHouseSearchContext.SellItems, {link = wow.link(6576, nil, "Fortified Cloak of the Monkey")})
+			assert.are.equal(0, #env.ah.itemQueries)
 		end)
 
 		it("reads the name out of an item link", function()

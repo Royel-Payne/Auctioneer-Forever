@@ -217,6 +217,8 @@ EventUtil.ContinueOnAddOnLoaded("Auctioneer", function()
 		"Help on the auction house Sell tab.")
 	checkbox(selling, "vendorCheck", "Vendor check in the Valuer",
 		"Compare the auction, after the 5% cut, with selling to a vendor.")
+	checkbox(selling, "exactMatch", "Price suffix items by exact name",
+		"For items like 'Cloak of the Monkey', Blizzard's list mixes in every variant and prices from the cheapest. List only the exact item in the Valuer and set the price to the cheapest of those.")
 	checkbox(selling, "sellSlotSwap", "Keep the old item when swapping the sell item",
 		"Dropping a new item on the sell slot leaves the old one in your bags instead of on the cursor.")
 	slider(selling, "staleHours", "Price history counts as old after", 1, 48, 1, hours,

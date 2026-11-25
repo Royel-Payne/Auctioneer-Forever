@@ -134,6 +134,7 @@ Internal.settingDefaults = {
 	dealsMinProfitCopper = 100, -- copper; any amount (gold/silver/copper input)
 	sellSlotSwap = true,       -- a new sell item leaves the old one in the bags
 	vendorCheck = true,        -- vendor check in the Valuer
+	exactMatch = true,         -- suffix items: list and price only the exact variant
 	staleHours = 6,            -- price history older than this shows orange (1-48)
 }
 

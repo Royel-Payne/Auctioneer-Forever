@@ -36,8 +36,12 @@ function addon.boot(env, opts)
 
 	run("Auctioneer/Modules/Scanner/Scanner.lua")
 	run("Auctioneer/Modules/Tooltip/Tooltip.lua")
+	-- Files of one addon share its private table, as in the client.
+	local namespaces = {}
 	for _, file in ipairs(opts.files or {}) do
-		run(file)
+		local addonName = file:match("^([^/]+)/")
+		namespaces[addonName] = namespaces[addonName] or {}
+		run(file, addonName, namespaces[addonName])
 	end
 
 	A.Auctioneer = Auctioneer

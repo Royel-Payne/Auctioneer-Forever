@@ -2,6 +2,9 @@ if not Auctioneer then return end
 
 -- Create a new Auctioneer module.
 local Module = Auctioneer:Module("Util:Valuer")
+-- Exact.lua (loaded next) adds to this module through the addon's private table.
+local _, private = ...
+if private then private.Valuer = Module end
 local Const = Auctioneer.Const()
 
 local valuerFrame
@@ -14,6 +17,7 @@ function Module:Boot(hook)
 	hook(Const.ItemKeyInfoFound, Module.ItemKeyInfoFound)
 	Module:CreateFrame()
 	Module:HookSellFrames()
+	if Module.ExactBoot then Module:ExactBoot() end
 end
 
 -- The sell item can be shown before its item key info arrives; show it again when it does.
@@ -79,60 +83,15 @@ function Module:SellItemLoaded(itemType, itemLocation)
 		info.name = name
 	end
 
-	self.current = {item = item, info = info, name = name, listKey = listKey}
+	-- Shown again once item key info arrives: the same item, maybe with its variant's key now.
+	local reloaded = self.current and self.current.itemLocation == itemLocation and
+		(not Module.SameKey or Module.SameKey(self.current.item.itemKey, itemKey))
+	self.current = {item = item, info = info, name = name, listKey = listKey, itemLocation = itemLocation}
+	if not reloaded and self.ExactItemLoaded then
+		-- Exact.lua: list this exact variant's auctions (only once per item placed).
+		self:ExactItemLoaded(self.current, itemType, listKey)
+	end
 	self:Render(self:ActiveSellFrame())
-end
-
--- The name in an item link, without brackets.
-function Module.LinkName(link)
-	return link and link:match("|h%[(.-)%]|h") or nil
-end
-
--- What the sell frame's list holds, from rows of {name, unitPrice}: how many are the
--- item named `name`, their prices cheapest first, and a count per other name.
-function Module.ListingSummary(rows, name)
-	local summary = {exact = 0, total = #rows, others = {}, prices = {}}
-	for _, row in ipairs(rows) do
-		if row.name == name then
-			summary.exact = summary.exact + 1
-			if row.unitPrice and row.unitPrice > 0 then
-				tinsert(summary.prices, row.unitPrice)
-			end
-		elseif row.name then
-			summary.others[row.name] = (summary.others[row.name] or 0) + 1
-		end
-	end
-	table.sort(summary.prices)
-	summary.lowest = summary.prices[1]
-	local others = {}
-	for otherName, count in pairs(summary.others) do
-		tinsert(others, {name = otherName, count = count})
-	end
-	table.sort(others, function(a, b)
-		if a.count ~= b.count then return a.count > b.count end
-		return a.name < b.name
-	end)
-	summary.others = others
-	return summary
-end
-
--- The listings Blizzard's item sell list received for an item key, as ListingSummary rows.
-function Module.ListingRows(itemKey)
-	local rows = {}
-	local count = C_AuctionHouse.GetItemSearchResultsQuantity and
-		C_AuctionHouse.GetItemSearchResultsQuantity(itemKey) or 0
-	for i = 1, count do
-		local result = C_AuctionHouse.GetItemSearchResultInfo(itemKey, i)
-		if result then
-			local quantity = math.max(result.quantity or 1, 1)
-			local price = result.buyoutAmount or result.bidAmount
-			tinsert(rows, {
-				name = Module.LinkName(result.itemLink),
-				unitPrice = price and math.floor(price / quantity),
-			})
-		end
-	end
-	return rows
 end
 
 -- Fonts, as in Blizzard's own sell frame: labels and headings in Friz Quadrata,
@@ -204,8 +163,6 @@ function Module:Render(sellFrame)
 	local id = item:ID()
 	addCount(lines, "|cff808080Auctioneer StatID|r", "|cff808080"..id.."|r")
 
-	self:AddListings(lines, sellFrame)
-
 	local stats = Auctioneer:Statistics(id)
 	for _, stat in ipairs(stats) do
 		addDivider(lines)
@@ -242,44 +199,6 @@ function Module:Render(sellFrame)
 	end
 
 	self:AddVendorCheck(lines, sellFrame)
-end
-
--- What is on sale now of this exact item. For a random-suffix item ("of the Monkey")
--- Blizzard's list on the left holds every variant of the item, so pick out by name
--- the listings that are this one. Price history is kept per variant already.
-local SHOWN_PRICES = 5
-function Module:AddListings(lines, sellFrame)
-	local current = self.current
-	if not current.name or not current.listKey or current.listKey.itemSuffix == 0 then
-		return
-	end
-	if not sellFrame or sellFrame ~= (AuctionHouseFrame and AuctionHouseFrame.ItemSellFrame) then
-		return
-	end
-
-	local summary = Module.ListingSummary(Module.ListingRows(current.listKey), current.name)
-	if summary.total == 0 then
-		return
-	end
-
-	addDivider(lines)
-	addHeader(lines, "On sale now, this exact item")
-	if summary.exact == 0 then
-		lines:AddSingleLine(LABEL_SIZE, "LEFT", LABEL_FONT):Set(
-			"|cffff9933 - none: the list on the left is other variants|r")
-	else
-		addCount(lines, " - listed", "x"..summary.exact)
-		for i = 1, math.min(#summary.prices, SHOWN_PRICES) do
-			addMoney(lines, i == 1 and " - cheapest, per item" or "", summary.prices[i])
-		end
-	end
-
-	local otherCount = summary.total - summary.exact
-	if otherCount > 0 then
-		lines:AddSingleLine(LABEL_SIZE, "LEFT", LABEL_FONT):Set(format(
-			"|cff808080 The list on the left also has %d of %d other variant%s.|r",
-			otherCount, #summary.others, #summary.others == 1 and "" or "s"))
-	end
 end
 
 -- Vendor check: does posting at the asking price beat selling to a vendor?
@@ -420,15 +339,7 @@ function Module:CreateFrame()
 	local lines = Auctioneer.GUI:Lines(detail)
 	detail.lines = lines
 
-	-- Blizzard's item sell list fills in after the item is placed: show it when it does.
-	local events = CreateFrame("Frame", nil, valuerFrame)
-	events:RegisterEvent("ITEM_SEARCH_RESULTS_UPDATED")
-	events:RegisterEvent("ITEM_SEARCH_RESULTS_ADDED")
-	events:SetScript("OnEvent", function()
-		if Module.current and valuerFrame:IsShown() then
-			Module:Render(Module:ActiveSellFrame())
-		end
-	end)
+	if Module.ExactCreate then Module:ExactCreate(inset, detail) end
 
 
 	valuerFrame:Hide()
@@ -451,5 +362,7 @@ end
 function Module:Hide()
 	self.waitingInfo = nil
 	self.current = nil
+	self.exact = nil
+	if self.ExactHide then self:ExactHide() end
 	valuerFrame:Hide()
 end

@@ -195,6 +195,22 @@ local function newAH(env)
 		return nil
 	end
 
+	-- Item searches (one item key's auctions): recorded; results set by a spec in
+	-- ah.itemResults[itemID..":"..suffix].
+	ah.itemQueries = {}
+	ah.itemResults = {}
+	local function resultsKey(itemKey) return itemKey.itemID .. ":" .. (itemKey.itemSuffix or 0) end
+	function api.SendSearchQuery(itemKey, sorts, separateOwnerItems)
+		table.insert(ah.itemQueries, {itemKey = itemKey, sorts = sorts})
+	end
+	function api.GetNumItemSearchResults(itemKey)
+		return #(ah.itemResults[resultsKey(itemKey)] or {})
+	end
+	function api.GetItemSearchResultInfo(itemKey, i)
+		return (ah.itemResults[resultsKey(itemKey)] or {})[i]
+	end
+	function api.HasFullItemSearchResults() return true end
+
 	ah.api = api
 	ah:load({})
 	return ah
@@ -291,6 +307,8 @@ function wow.install()
 
 	_G.Enum = {AuctionHouseSortOrder = {Price = 0, Name = 1}}
 	_G.AuctionHouseFrameDisplayMode = setmetatable({}, {__index = function(_, k) return k end})
+	_G.AuctionHouseSearchContext = {SellItems = 1, SellCommodities = 2}
+	_G.GameTooltip_Hide = function() end
 	_G.AuctionHouseFrame = null()
 	rawset(_G.AuctionHouseFrame, "GetDisplayMode", function() return AuctionHouseFrameDisplayMode.Buy end)
 	_G.ITEM_QUALITY_COLORS = setmetatable({}, {__index = function() return {hex = "|cffffffff"} end})
