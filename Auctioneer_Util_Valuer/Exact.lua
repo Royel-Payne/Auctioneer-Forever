@@ -32,11 +32,6 @@ local function sameKey(a, b)
 end
 Module.SameKey = sameKey
 
--- Auction house buyouts are whole silver: round a price from history to one.
-function Module.WholeSilver(copper)
-	return math.max(100, math.floor(copper / 100 + 0.5) * 100)
-end
-
 -- Search results as list rows for the item named `name`, cheapest buyout per item first
 -- (bid-only auctions last). A result without a link is kept: it was asked for by key.
 function Module.ExactRows(results, name)
@@ -73,11 +68,11 @@ function Module.ExactPrice(rows, historyPrice, typed, undercut)
 			if row.mine then
 				return row.buyout, "mine"
 			end
-			return Module.Undercut(row.buyout, undercut, true), "listing"
+			return Module.Undercut(row.buyout, undercut), "listing"
 		end
 	end
 	if historyPrice and historyPrice > 0 then
-		return Module.WholeSilver(historyPrice), "history"
+		return math.max(1, math.floor(historyPrice + 0.5)), "history"
 	end
 	return nil, "none"
 end

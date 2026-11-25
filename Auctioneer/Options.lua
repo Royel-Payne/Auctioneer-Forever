@@ -222,7 +222,7 @@ EventUtil.ContinueOnAddOnLoaded("Auctioneer", function()
 	checkbox(selling, "exactMatch", "Price suffix items by exact name",
 		"For items like 'Cloak of the Monkey', Blizzard's list mixes in every variant and prices from the cheapest. List only the exact item in the Valuer and set the price to the cheapest of those.")
 	money(selling, "undercutCopper", "Undercut the cheapest by",
-		"When the price is set from the cheapest listing (Blizzard's or the exact match), take this much off. Not when the cheapest is yours, and never over a price you typed. Item buyouts are whole silver, so items round down to a silver. The vendor check and the Deal finder's resale profit count it. 0 matches the cheapest.")
+		"When the price is set from the cheapest listing (Blizzard's or the exact match), take this much off. Not when the cheapest is yours, and never over a price you typed. The vendor check and the Deal finder's resale profit count it. 0 matches the cheapest.")
 	checkbox(selling, "sellSlotSwap", "Keep the old item when swapping the sell item",
 		"Dropping a new item on the sell slot leaves the old one in your bags instead of on the cursor.")
 	slider(selling, "staleHours", "Price history counts as old after", 1, 48, 1, hours,

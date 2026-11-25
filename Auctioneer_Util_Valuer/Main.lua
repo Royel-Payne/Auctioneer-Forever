@@ -230,17 +230,13 @@ function Module.VendorNumbers(vendorPrice, unitPrice, quantity)
 	}
 end
 
--- `price` lowered by your undercut. Item buyouts are whole silver, so an item's price is
--- rounded down to one (at least 1 silver); commodities take any copper (at least 1).
-function Module.Undercut(price, undercut, wholeSilver)
+-- `price` lowered by your undercut, to the copper (this client takes copper in item
+-- buyouts as well as commodity prices), and at least 1 copper.
+function Module.Undercut(price, undercut)
 	if not price or not undercut or undercut <= 0 then
 		return price
 	end
-	local lowered = price - undercut
-	if wholeSilver then
-		return math.max(100, math.floor(lowered / 100) * 100)
-	end
-	return math.max(1, lowered)
+	return math.max(1, price - undercut)
 end
 
 function Module:ActiveSellFrame()
@@ -299,7 +295,7 @@ local function cheapestListing(sellFrame, itemLocation)
 		local result = itemID and C_AuctionHouse.GetNumCommoditySearchResults(itemID) > 0 and
 			C_AuctionHouse.GetCommoditySearchResultInfo(itemID, 1)
 		if result then
-			return result.unitPrice, result.containsOwnerItem, false
+			return result.unitPrice, result.containsOwnerItem
 		end
 		return
 	end
@@ -310,7 +306,7 @@ local function cheapestListing(sellFrame, itemLocation)
 		C_AuctionHouse.GetItemSearchResultInfo(listKey, 1)
 	if result and result.buyoutAmount then
 		local quantity = math.max(result.quantity or 1, 1)
-		return math.floor(result.buyoutAmount / quantity), result.containsOwnerItem, true
+		return math.floor(result.buyoutAmount / quantity), result.containsOwnerItem
 	end
 end
 
@@ -326,7 +322,7 @@ function Module:UndercutBlizzard(sellFrame)
 	if not sellFrame:IsShown() then return end
 	local itemLocation = sellFrame:GetItem()
 	if not itemLocation or not itemLocation:IsValid() then return end
-	local cheapest, mine, wholeSilver = cheapestListing(sellFrame, itemLocation)
+	local cheapest, mine = cheapestListing(sellFrame, itemLocation)
 	if not cheapest or cheapest <= 0 then return end
 	local price = sellFrame.PriceInput:GetAmount()
 	if price ~= cheapest then
@@ -335,7 +331,7 @@ function Module:UndercutBlizzard(sellFrame)
 	end
 	current.undercutDone = true
 	if mine then return end
-	local lowered = Module.Undercut(cheapest, undercut, wholeSilver)
+	local lowered = Module.Undercut(cheapest, undercut)
 	if lowered and lowered < cheapest then
 		current.undercut = cheapest - lowered
 		sellFrame.PriceInput:SetAmount(lowered)

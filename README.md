@@ -41,8 +41,7 @@ To update, do the same with a newer zip.
   It never overwrites a price you typed; click a row to use its price.
 - **Undercut:** set an amount in the settings and, when the price comes from the cheapest
   listing (Blizzard's pick or the exact match), Auctioneer posts that much below it. Not
-  when the cheapest is yours, and never over a price you typed. Item buyouts are whole
-  silver, so an item's price rounds down to a silver. The vendor check shows the undercut,
+  when the cheapest is yours, and never over a price you typed. The vendor check shows the undercut,
   and the Deal finder counts it in what you'd make reselling.
 - **Swapping the sell item:** drop a different item on the sell slot and the old one
   simply stays in your bags.
