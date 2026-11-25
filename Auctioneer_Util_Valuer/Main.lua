@@ -89,20 +89,21 @@ function Module.LinkName(link)
 end
 
 -- What the sell frame's list holds, from rows of {name, unitPrice}: how many are the
--- item named `name`, the lowest price among those, and a count per other name.
+-- item named `name`, their prices cheapest first, and a count per other name.
 function Module.ListingSummary(rows, name)
-	local summary = {exact = 0, total = #rows, others = {}}
+	local summary = {exact = 0, total = #rows, others = {}, prices = {}}
 	for _, row in ipairs(rows) do
 		if row.name == name then
 			summary.exact = summary.exact + 1
-			if row.unitPrice and row.unitPrice > 0 and
-			(not summary.lowest or row.unitPrice < summary.lowest) then
-				summary.lowest = row.unitPrice
+			if row.unitPrice and row.unitPrice > 0 then
+				tinsert(summary.prices, row.unitPrice)
 			end
 		elseif row.name then
 			summary.others[row.name] = (summary.others[row.name] or 0) + 1
 		end
 	end
+	table.sort(summary.prices)
+	summary.lowest = summary.prices[1]
 	local others = {}
 	for otherName, count in pairs(summary.others) do
 		tinsert(others, {name = otherName, count = count})
@@ -203,13 +204,9 @@ function Module:Render(sellFrame)
 	local id = item:ID()
 	addCount(lines, "|cff808080Auctioneer StatID|r", "|cff808080"..id.."|r")
 
-	local mixed = self:AddListings(lines, sellFrame)
+	self:AddListings(lines, sellFrame)
 
 	local stats = Auctioneer:Statistics(id)
-	if mixed and #stats > 0 then
-		lines:AddSingleLine(LABEL_SIZE, "LEFT", LABEL_FONT):Set(
-			"|cffff9933Price history below may include those other variants.|r")
-	end
 	for _, stat in ipairs(stats) do
 		addDivider(lines)
 		addHeader(lines, format("%s statistics", stat.name))
@@ -247,50 +244,42 @@ function Module:Render(sellFrame)
 	self:AddVendorCheck(lines, sellFrame)
 end
 
--- What is on sale now in Blizzard's list for an item (not a commodity), checked by
--- name: for a random-suffix item that list can hold other variants. Returns whether
--- the price history may mix variants (the list holds others under the same key).
+-- What is on sale now of this exact item. For a random-suffix item ("of the Monkey")
+-- Blizzard's list on the left holds every variant of the item, so pick out by name
+-- the listings that are this one. Price history is kept per variant already.
+local SHOWN_PRICES = 5
 function Module:AddListings(lines, sellFrame)
 	local current = self.current
 	if not current.name or not current.listKey or current.listKey.itemSuffix == 0 then
-		return false
+		return
 	end
 	if not sellFrame or sellFrame ~= (AuctionHouseFrame and AuctionHouseFrame.ItemSellFrame) then
-		return false
+		return
 	end
 
 	local summary = Module.ListingSummary(Module.ListingRows(current.listKey), current.name)
 	if summary.total == 0 then
-		return false
+		return
 	end
 
 	addDivider(lines)
-	addHeader(lines, "On sale now")
-	if summary.exact > 0 then
-		addCount(lines, " - listed, this exact item", "x"..summary.exact)
-		if summary.lowest then
-			addMoney(lines, " - lowest, per item", summary.lowest)
-		end
+	addHeader(lines, "On sale now, this exact item")
+	if summary.exact == 0 then
+		lines:AddSingleLine(LABEL_SIZE, "LEFT", LABEL_FONT):Set(
+			"|cffff9933 - none: the list on the left is other variants|r")
 	else
-		lines:AddSingleLine(LABEL_SIZE, "LEFT", LABEL_FONT):Set(
-			"|cffff9933 - none of the list on the left is this item|r")
-	end
-
-	if #summary.others > 0 then
-		lines:AddSingleLine(LABEL_SIZE, "LEFT", LABEL_FONT):Set(
-			"|cffff9933 The list on the left also shows other variants:|r")
-		for i = 1, math.min(#summary.others, 3) do
-			local other = summary.others[i]
-			addCount(lines, "   "..other.name, "x"..other.count)
-		end
-		if #summary.others > 3 then
-			lines:AddSingleLine(LABEL_SIZE, "LEFT", LABEL_FONT):Set(
-				format("   and %d more", #summary.others - 3))
+		addCount(lines, " - listed", "x"..summary.exact)
+		for i = 1, math.min(#summary.prices, SHOWN_PRICES) do
+			addMoney(lines, i == 1 and " - cheapest, per item" or "", summary.prices[i])
 		end
 	end
 
-	local statsKey = current.item.itemKey
-	return #summary.others > 0 and Auctioneer:ItemKeyKey(statsKey) == Auctioneer:ItemKeyKey(current.listKey)
+	local otherCount = summary.total - summary.exact
+	if otherCount > 0 then
+		lines:AddSingleLine(LABEL_SIZE, "LEFT", LABEL_FONT):Set(format(
+			"|cff808080 The list on the left also has %d of %d other variant%s.|r",
+			otherCount, #summary.others, #summary.others == 1 and "" or "s"))
+	end
 end
 
 -- Vendor check: does posting at the asking price beat selling to a vendor?

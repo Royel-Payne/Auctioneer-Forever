@@ -100,6 +100,7 @@ describe("Valuer", function()
 			}, "Cloak of the Monkey")
 			assert.are.equal(2, s.exact)
 			assert.are.equal(1999, s.lowest)
+			assert.are.same({1999, 2500}, s.prices)
 			assert.are.same({
 				{name = "Cloak of Shadow Protection", count = 2},
 				{name = "Cloak of the Wolf", count = 1},
