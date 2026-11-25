@@ -24,9 +24,9 @@ To update, do the same with a newer zip.
 ## Using it
 
 - **Scan prices:** happens by itself. When you open the auction house and the prices are
-  over an hour old, Auctioneer scans once and says so in chat. To rescan by hand, click
-  **Search** with the search box empty (hover the button to see when the last scan was).
-  Auctioneer never searches on a timer.
+  over an hour old, Auctioneer scans once and says so in chat. To rescan by hand, clear
+  the search box, category and filters: the **Search** button then reads **Scan**
+  (hover it to see when the last scan was). Auctioneer never searches on a timer.
 - **Tooltips:** item tooltips show the prices from your scans.
 - **Deal finder:** after a scan, a panel next to the auction house lists items posted
   below their usual price.
@@ -34,13 +34,19 @@ To update, do the same with a newer zip.
   its price history (with when it was last seen at auction) and a **vendor check**: whether the auction pays more than a vendor
   after the auction house's 5% cut, the deposit you lose if it doesn't sell, and the
   lowest price that beats the vendor.
+- **Items with a suffix** ("Cloak of the Monkey"): Blizzard's list on the Sell tab mixes
+  in every variant and prices yours like the cheapest of them, which can be far too low.
+  Auctioneer looks up your exact item, lists only those auctions under the Valuer, and
+  sets your price to the cheapest of them (or from its price history if none are listed).
+  It never overwrites a price you typed; click a row to use its price.
 - **Swapping the sell item:** drop a different item on the sell slot and the old one
   simply stays in your bags.
 - The auction house window can be dragged around.
 
 **Settings:** *Options > AddOns > Auctioneer*, or type `/auc`. Turn the scan on opening
 on or off and choose how old prices must be first (1 to 24 hours), set the Deal finder's
-minimum discount and profit, and switch the vendor check and the sell-slot swap on or off.
+minimum discount and profit, and switch the Scan label, the vendor check, exact-name
+pricing for suffix items and the sell-slot swap on or off.
 
 Don't care about disenchanting? Untick **Enchantrix** in the AddOns list. Keep `Stubby`,
 `SlideBar` and `!Swatter` on: the others need them.
@@ -60,7 +66,8 @@ the Forever client. This fork adds:
 - fixes from the open pull requests on the Forever port: Enchantrix and SlideBar errors,
   faster scans, tooltip prices for linked and random-suffix ("of the Bear") items, and
   Deal finder / Valuer bug fixes;
-- the vendor check and the sell-slot swap;
+- the vendor check, exact-name pricing for suffix items, the Scan label and the
+  sell-slot swap;
 - a cleanup of files the game never loaded.
 
 Licensed under the GNU GPL v2, see [`LICENSE`](LICENSE).
