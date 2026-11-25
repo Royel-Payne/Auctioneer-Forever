@@ -14,7 +14,7 @@ local _, private = ...
 local Module = private and private.Valuer
 if not Module then return end
 
-local ROWS, ROW_HEIGHT = 8, 16
+local ROWS, ROW_HEIGHT = 6, 16 -- 6 rows leave room for the whole vendor check above; the wheel scrolls
 local LABEL_FONT = "Fonts\\FRIZQT__.TTF"
 local NUMBER_FONT = "Fonts\\ARIALN.TTF"
 
