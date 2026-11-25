@@ -149,19 +149,73 @@ function Module:HookSearch()
 		end)
 	end
 
-	local button = AuctionHouseFrame and AuctionHouseFrame.SearchBar and AuctionHouseFrame.SearchBar.SearchButton
+	local searchBar = AuctionHouseFrame and AuctionHouseFrame.SearchBar
+	local button = searchBar and searchBar.SearchButton
 	if button and not self.buttonHooked then
 		self.buttonHooked = true
 		button:HookScript("OnEnter", function(b)
 			GameTooltip:SetOwner(b, "ANCHOR_RIGHT")
-			GameTooltip:SetText("Search")
-			GameTooltip:AddLine("Auctioneer: leave the search box empty to scan the whole auction house.", 1, 1, 1, true)
+			if Module:SearchBarIsFull() then
+				GameTooltip:SetText("Scan")
+				GameTooltip:AddLine("Auctioneer: scan the whole auction house for prices.", 1, 1, 1, true)
+			else
+				GameTooltip:SetText("Search")
+				GameTooltip:AddLine("Auctioneer: to scan the whole auction house, clear the search box, the category and any filters.", 1, 1, 1, true)
+			end
 			local age = Module:ScanAge()
 			GameTooltip:AddLine(age and ("Last scan: "..Auctioneer:Ago(age)) or "No scan yet.", 0.6, 0.6, 0.6, true)
 			GameTooltip:Show()
 		end)
 		button:HookScript("OnLeave", function() GameTooltip:Hide() end)
+		self:HookSearchLabel(searchBar)
 	end
+end
+
+-- The query the search bar would send now, as far as a full scan is concerned.
+function Module:SearchBarQuery()
+	local searchBar = AuctionHouseFrame.SearchBar
+	local query = {searchString = searchBar.SearchBox:GetText() or ""}
+	query.minLevel, query.maxLevel = searchBar.FilterButton:GetLevelRange()
+	query.filters = searchBar.FilterButton:CalculateFiltersArray()
+	local categories = AuctionHouseFrame.CategoriesList
+	local selected = categories and categories.GetSelectedCategory and categories:GetSelectedCategory()
+	query.itemClassFilters = selected and {selected} or {}
+	return query
+end
+
+function Module:SearchBarIsFull()
+	local ok, query = pcall(self.SearchBarQuery, self)
+	return ok and Module.IsFullQuery(query)
+end
+
+-- The Search button reads "Scan" while pressing it would scan the whole auction house.
+function Module:UpdateSearchLabel()
+	local button = AuctionHouseFrame and AuctionHouseFrame.SearchBar and AuctionHouseFrame.SearchBar.SearchButton
+	if not button then return end
+	local label = SEARCH or "Search"
+	if Auctioneer:Setting("scanLabel") and self:SearchBarIsFull() then
+		label = "Scan"
+	end
+	if button:GetText() ~= label then
+		button:SetText(label)
+	end
+end
+
+-- Follow what changes a search: its text, the category, the filters and level range.
+function Module:HookSearchLabel(searchBar)
+	local update = function() Module:UpdateSearchLabel() end
+	if searchBar.SearchBox then
+		searchBar.SearchBox:HookScript("OnTextChanged", update)
+	end
+	searchBar:HookScript("OnShow", update)
+	if searchBar.UpdateClearFiltersButton then
+		hooksecurefunc(searchBar, "UpdateClearFiltersButton", update)
+	end
+	local categories = AuctionHouseFrame.CategoriesList
+	if categories and categories.SetSelectedCategory then
+		hooksecurefunc(categories, "SetSelectedCategory", update)
+	end
+	update()
 end
 
 function Module:AuctionHouseClosed()

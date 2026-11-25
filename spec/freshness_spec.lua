@@ -97,4 +97,43 @@ describe("Freshness", function()
 			assert.is_nil(valuer.HoursSinceSeen({}, 105))
 		end)
 	end)
+	describe("search button label", function()
+		local text, button, category, minLevel
+
+		before_each(function()
+			text, category, minLevel = "", nil, 0
+			button = {label = "Search"}
+			function button:GetText() return self.label end
+			function button:SetText(t) self.label = t end
+			rawset(AuctionHouseFrame, "SearchBar", {
+				SearchButton = button,
+				SearchBox = {GetText = function() return text end},
+				FilterButton = {
+					GetLevelRange = function() return minLevel, 0 end,
+					CalculateFiltersArray = function() return {} end,
+				},
+			})
+			rawset(AuctionHouseFrame, "CategoriesList", {GetSelectedCategory = function() return category end})
+		end)
+
+		it("reads Scan only while the search would scan everything", function()
+			scanner:UpdateSearchLabel()
+			assert.are.equal("Scan", button.label)
+			text = "linen"
+			scanner:UpdateSearchLabel()
+			assert.are.equal("Search", button.label)
+			text, category = "", 3
+			scanner:UpdateSearchLabel()
+			assert.are.equal("Search", button.label)
+			category, minLevel = nil, 10
+			scanner:UpdateSearchLabel()
+			assert.are.equal("Search", button.label)
+		end)
+
+		it("keeps Blizzard's label when turned off", function()
+			_G.AuctioneerSettings = {scanLabel = false}
+			scanner:UpdateSearchLabel()
+			assert.are.equal("Search", button.label)
+		end)
+	end)
 end)
