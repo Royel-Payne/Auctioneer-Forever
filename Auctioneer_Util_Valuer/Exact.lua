@@ -163,7 +163,7 @@ function Module:ExactCreate(parent, detail)
 	local list = CreateFrame("Frame", nil, parent)
 	list:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 8, 8)
 	list:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -8, 8)
-	list:SetHeight(44 + ROWS * ROW_HEIGHT)
+	list:SetHeight(64 + ROWS * ROW_HEIGHT)
 	list:Hide()
 	self.exactList = list
 	self.exactDetail = detail
@@ -188,6 +188,7 @@ function Module:ExactCreate(parent, detail)
 	status:SetPoint("RIGHT", list, "RIGHT", 0, 0)
 	status:SetJustifyH("LEFT")
 	status:SetWordWrap(true)
+	status:SetMaxLines(3)
 	list.status = status
 
 	list.offset = 0
@@ -195,8 +196,13 @@ function Module:ExactCreate(parent, detail)
 	for i = 1, ROWS do
 		local row = CreateFrame("Button", nil, list)
 		row:SetHeight(ROW_HEIGHT)
-		row:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -38 - (i - 1) * ROW_HEIGHT)
-		row:SetPoint("TOPRIGHT", list, "TOPRIGHT", 0, -38 - (i - 1) * ROW_HEIGHT)
+		-- Rows follow the status text, which may take two lines.
+		if i == 1 then
+			row:SetPoint("TOPLEFT", status, "BOTTOMLEFT", 0, -4)
+		else
+			row:SetPoint("TOPLEFT", list.rows[i - 1], "BOTTOMLEFT", 0, 0)
+		end
+		row:SetPoint("RIGHT", list, "RIGHT", 0, 0)
 		row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
 
 		row.price = row:CreateFontString(nil, "OVERLAY")
@@ -241,7 +247,7 @@ end
 
 local STATUS = {
 	searching = "Searching the auction house for this exact item...",
-	listing = "|cff40ff40Price set to the cheapest of these.|r Blizzard's list on the left mixes in every variant.",
+	listing = "|cff40ff40Price set to the cheapest of these.|r\n|cff999999Blizzard's list on the left mixes in every variant.|r",
 	clicked = "|cff40ff40Price set to the row you clicked.|r",
 	history = "|cffff9933None listed: price set from this item's price history.|r",
 	typed = "Your own price was kept. Click a row to use its price.",
