@@ -385,7 +385,7 @@ function Module:AddVendorCheck(lines, sellFrame)
 	addMoney(lines, " - beats vendor at, per item", n.breakEven)
 	local undercut = self.current and self.current.undercut
 	if undercut and undercut > 0 then
-		addMoney(lines, " - undercut, already in the price", undercut)
+		addMoney(lines, " - undercut, in the price", undercut)
 	end
 
 	if price > 0 then
