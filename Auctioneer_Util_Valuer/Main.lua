@@ -48,6 +48,20 @@ function Module:SellItemLoaded(itemType, itemLocation)
 		return
 	end
 
+	-- The key the auction house gives for a random-suffix item ("of the Monkey") can be
+	-- another variant's: Blizzard's own list then shows that variant. Price the item by
+	-- the scanned variant whose name is the item's, when one is known.
+	local listKey = itemKey
+	local link = C_Item.GetItemLink and C_Item.GetItemLink(itemLocation)
+	local namesPending = false
+	if itemKey.itemSuffix ~= 0 and link then
+		local variantKey
+		variantKey, namesPending = Auctioneer:VariantFromLink(link, itemKey.itemID)
+		if variantKey then
+			itemKey = variantKey
+		end
+	end
+
 	local item = Auctioneer:Item{
 		itemKey = itemKey,
 		itemLocation = itemLocation
@@ -55,12 +69,69 @@ function Module:SellItemLoaded(itemType, itemLocation)
 
 	local info = item:Info()
 	self.waitingInfo = nil
-	if not item.itemInfo then
+	if not item.itemInfo or namesPending then
 		self.waitingInfo = {itemID = itemKey.itemID, itemType = itemType, itemLocation = itemLocation}
 	end
 
-	self.current = {item = item, info = info}
+	local name = Module.LinkName(link)
+	if name then
+		-- The item's own name: the variant's key info name may not have arrived.
+		info.name = name
+	end
+
+	self.current = {item = item, info = info, name = name, listKey = listKey}
 	self:Render(self:ActiveSellFrame())
+end
+
+-- The name in an item link, without brackets.
+function Module.LinkName(link)
+	return link and link:match("|h%[(.-)%]|h") or nil
+end
+
+-- What the sell frame's list holds, from rows of {name, unitPrice}: how many are the
+-- item named `name`, the lowest price among those, and a count per other name.
+function Module.ListingSummary(rows, name)
+	local summary = {exact = 0, total = #rows, others = {}}
+	for _, row in ipairs(rows) do
+		if row.name == name then
+			summary.exact = summary.exact + 1
+			if row.unitPrice and row.unitPrice > 0 and
+			(not summary.lowest or row.unitPrice < summary.lowest) then
+				summary.lowest = row.unitPrice
+			end
+		elseif row.name then
+			summary.others[row.name] = (summary.others[row.name] or 0) + 1
+		end
+	end
+	local others = {}
+	for otherName, count in pairs(summary.others) do
+		tinsert(others, {name = otherName, count = count})
+	end
+	table.sort(others, function(a, b)
+		if a.count ~= b.count then return a.count > b.count end
+		return a.name < b.name
+	end)
+	summary.others = others
+	return summary
+end
+
+-- The listings Blizzard's item sell list received for an item key, as ListingSummary rows.
+function Module.ListingRows(itemKey)
+	local rows = {}
+	local count = C_AuctionHouse.GetItemSearchResultsQuantity and
+		C_AuctionHouse.GetItemSearchResultsQuantity(itemKey) or 0
+	for i = 1, count do
+		local result = C_AuctionHouse.GetItemSearchResultInfo(itemKey, i)
+		if result then
+			local quantity = math.max(result.quantity or 1, 1)
+			local price = result.buyoutAmount or result.bidAmount
+			tinsert(rows, {
+				name = Module.LinkName(result.itemLink),
+				unitPrice = price and math.floor(price / quantity),
+			})
+		end
+	end
+	return rows
 end
 
 -- Fonts, as in Blizzard's own sell frame: labels and headings in Friz Quadrata,
@@ -132,7 +203,13 @@ function Module:Render(sellFrame)
 	local id = item:ID()
 	addCount(lines, "|cff808080Auctioneer StatID|r", "|cff808080"..id.."|r")
 
+	local mixed = self:AddListings(lines, sellFrame)
+
 	local stats = Auctioneer:Statistics(id)
+	if mixed and #stats > 0 then
+		lines:AddSingleLine(LABEL_SIZE, "LEFT", LABEL_FONT):Set(
+			"|cffff9933Price history below may include those other variants.|r")
+	end
 	for _, stat in ipairs(stats) do
 		addDivider(lines)
 		addHeader(lines, format("%s statistics", stat.name))
@@ -168,6 +245,52 @@ function Module:Render(sellFrame)
 	end
 
 	self:AddVendorCheck(lines, sellFrame)
+end
+
+-- What is on sale now in Blizzard's list for an item (not a commodity), checked by
+-- name: for a random-suffix item that list can hold other variants. Returns whether
+-- the price history may mix variants (the list holds others under the same key).
+function Module:AddListings(lines, sellFrame)
+	local current = self.current
+	if not current.name or not current.listKey or current.listKey.itemSuffix == 0 then
+		return false
+	end
+	if not sellFrame or sellFrame ~= (AuctionHouseFrame and AuctionHouseFrame.ItemSellFrame) then
+		return false
+	end
+
+	local summary = Module.ListingSummary(Module.ListingRows(current.listKey), current.name)
+	if summary.total == 0 then
+		return false
+	end
+
+	addDivider(lines)
+	addHeader(lines, "On sale now")
+	if summary.exact > 0 then
+		addCount(lines, " - listed, this exact item", "x"..summary.exact)
+		if summary.lowest then
+			addMoney(lines, " - lowest, per item", summary.lowest)
+		end
+	else
+		lines:AddSingleLine(LABEL_SIZE, "LEFT", LABEL_FONT):Set(
+			"|cffff9933 - none of the list on the left is this item|r")
+	end
+
+	if #summary.others > 0 then
+		lines:AddSingleLine(LABEL_SIZE, "LEFT", LABEL_FONT):Set(
+			"|cffff9933 The list on the left also shows other variants:|r")
+		for i = 1, math.min(#summary.others, 3) do
+			local other = summary.others[i]
+			addCount(lines, "   "..other.name, "x"..other.count)
+		end
+		if #summary.others > 3 then
+			lines:AddSingleLine(LABEL_SIZE, "LEFT", LABEL_FONT):Set(
+				format("   and %d more", #summary.others - 3))
+		end
+	end
+
+	local statsKey = current.item.itemKey
+	return #summary.others > 0 and Auctioneer:ItemKeyKey(statsKey) == Auctioneer:ItemKeyKey(current.listKey)
 end
 
 -- Vendor check: does posting at the asking price beat selling to a vendor?
@@ -307,6 +430,16 @@ function Module:CreateFrame()
 	-- GUI:Lines() is like a tooltip, you add lines to it. Then when done, :Free()
 	local lines = Auctioneer.GUI:Lines(detail)
 	detail.lines = lines
+
+	-- Blizzard's item sell list fills in after the item is placed: show it when it does.
+	local events = CreateFrame("Frame", nil, valuerFrame)
+	events:RegisterEvent("ITEM_SEARCH_RESULTS_UPDATED")
+	events:RegisterEvent("ITEM_SEARCH_RESULTS_ADDED")
+	events:SetScript("OnEvent", function()
+		if Module.current and valuerFrame:IsShown() then
+			Module:Render(Module:ActiveSellFrame())
+		end
+	end)
 
 
 	valuerFrame:Hide()
