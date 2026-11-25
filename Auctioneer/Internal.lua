@@ -129,6 +129,7 @@ Internal.settingDefaults = {
 	autoScan = true,           -- scan when the auction house opens and prices are stale
 	autoScanHours = 1,         -- how old the last scan must be first (1-24)
 	announceScan = true,       -- say so in chat
+	scanLabel = true,          -- the Search button reads "Scan" when it would scan everything
 	dealsOpenAfterScan = true, -- open the Deal finder after a scan you start
 	dealsMinDiscount = 25,     -- percent below vendor or usual price (5-90)
 	dealsMinProfitCopper = 100, -- copper; any amount (gold/silver/copper input)

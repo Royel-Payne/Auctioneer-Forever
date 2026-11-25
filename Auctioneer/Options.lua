@@ -203,6 +203,8 @@ EventUtil.ContinueOnAddOnLoaded("Auctioneer", function()
 		"Print a line in chat when Auctioneer starts a scan by itself.", true)
 	local hoursSlider = slider(scanning, "autoScanHours", "Only if the last scan is older than", 1, 24, 1, hours,
 		"How old the last full scan must be before opening the auction house scans again.", true)
+	checkbox(scanning, "scanLabel", "Search button reads \"Scan\" when it scans everything",
+		"With the search box, category and filters all clear, the Search button scans the whole auction house: label it Scan then.")
 
 	local deals = section(panel, scanning, "Deal finder",
 		"Auctions listed well below what a vendor pays, or below the item's usual price.")
