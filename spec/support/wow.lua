@@ -306,6 +306,7 @@ function wow.install()
 	_G.EventTrace = {LogMessage = function(_, msg) table.insert(env.etrace, msg) end}
 
 	_G.Enum = {AuctionHouseSortOrder = {Price = 0, Name = 1}}
+	_G.MinimalSliderWithSteppersMixin = {Label = {Right = "Right"}, Event = {OnValueChanged = "OnValueChanged"}}
 	_G.AuctionHouseFrameDisplayMode = setmetatable({}, {__index = function(_, k) return k end})
 	_G.AuctionHouseSearchContext = {SellItems = 1, SellCommodities = 2}
 	_G.GameTooltip_Hide = function() end

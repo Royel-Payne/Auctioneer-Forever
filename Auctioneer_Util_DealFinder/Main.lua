@@ -129,7 +129,7 @@ function Module:Display()
 	end
 
 	-- The slider sets the minimum discount below the vendor or usual price.
-	local percent = floor(resultsFrame.percent:GetValue() + 0.5) / 100
+	local percent = (Auctioneer:Setting("dealsMinDiscount") or 25) / 100
 
 	local minProfit = Auctioneer:Setting("dealsMinProfitCopper") or 100
 	local undercut = Auctioneer:Setting("undercutCopper") or 0
@@ -148,34 +148,21 @@ function Module:Display()
 		table.sort(list, function(a, b) return a[4] > b[4] end)
 	end
 
-	-- 35 rows show at once; the first shown is resultsFrame.offset (0 = top).
-	local offset = math.max(0, math.min(resultsFrame.offset or 0, #list - 35))
+	-- As many rows as fit show at once; the first shown is resultsFrame.offset (0 = top).
+	resultsFrame:Show()
+	local rows = resultsFrame:RowsThatFit()
+	local offset = math.max(0, math.min(resultsFrame.offset or 0, #list - rows))
 	resultsFrame.offset = offset
-	resultsFrame.scroll:Set(#list, 35, offset)
-	resultsFrame.percentText:SetText(floor(percent*100).."%")
+	resultsFrame.scroll:Set(#list, rows, offset)
 
-	local lines = {}
-	for i = 1,35 do
-		local line = resultsFrame.lines[i]
-		local pos = i + offset
-		local deal = list[pos]
-		line:Reset()
-
+	for i, line in ipairs(resultsFrame.lines) do
+		local deal = i <= rows and list[i + offset]
 		if deal then
-			local item, itemPrice, dealType, margin = unpack(deal)
-			local name, link, color
-
-			local info = item:Info()
-
-			line.item = item
-			line.name:SetText("|c"..info.color..info.name.."|r")
-			line:SetMoney(margin)
-			if dealType == "vendor" then
-				line:SetVendor(true)
-			end
+			line:SetDeal(deal)
+		else
+			line:Reset()
 		end
 	end
-
 	resultsFrame:Show()
 end
 
@@ -225,99 +212,96 @@ function Module:CreateResults()
 		redisplay()
 	end)
 
-	-- Minimum discount: gold label, slider with a gold fill up to the thumb, value.
-	local percentLabel = resultsFrame:CreateFontString(nil, "OVERLAY")
-	percentLabel:SetPoint("TOPLEFT", inset, "BOTTOMLEFT", 8, -7)
-	percentLabel:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
-	percentLabel:SetTextColor(1, 0.82, 0)
+	-- Minimum discount: Blizzard's stepper slider, as on the settings page.
+	local percentLabel = resultsFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	percentLabel:SetPoint("TOPLEFT", inset, "BOTTOMLEFT", 8, -8)
 	percentLabel:SetText("Minimum discount")
 
-	local percent = CreateFrame("Slider", "AuctioneerDealFinderPercent", inset, "OptionsSliderTemplate")
-	percent:SetOrientation("HORIZONTAL")
-	percent:SetPoint("LEFT", percentLabel, "RIGHT", 10, 0)
-	percent:SetHeight(20)
-	percent:SetWidth(200)
-	percent:SetMinMaxValues(5, 90)
-	percent:SetValueStep(5)
-	percent:SetObeyStepOnDrag(true)
-	resultsFrame.percent = percent
-
-	local scrollName = percent:GetName()
-	_G[scrollName.."Low"]:SetText("")
-	_G[scrollName.."High"]:SetText("")
-	_G[scrollName.."Text"]:SetText("")
-
-	-- Track fill from the left end to the thumb, so the setting reads at a glance.
-	local FILL_INSET = 6
-	local fill = percent:CreateTexture(nil, "ARTWORK")
-	fill:SetTexture("Interface\\Buttons\\WHITE8X8")
-	fill:SetVertexColor(1, 0.82, 0, 0.75)
-	fill:SetHeight(4)
-	fill:SetPoint("LEFT", percent, "LEFT", FILL_INSET, 0)
-	local function updateFill()
-		local low, high = percent:GetMinMaxValues()
-		local share = (percent:GetValue() - low) / (high - low)
-		fill:SetWidth(math.max(1, (percent:GetWidth() - 2 * FILL_INSET) * share))
-	end
-
-	local percentText = resultsFrame:CreateFontString(nil, "OVERLAY")
-	percentText:SetPoint("LEFT", percent, "RIGHT", 8, 0)
-	percentText:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
-	percentText:SetJustifyH("LEFT")
-	resultsFrame.percentText = percentText
-
-	percent:SetScript("OnValueChanged", function(slider)
-		updateFill()
-		local value = floor(slider:GetValue() + 0.5)
-		percentText:SetText(value.."%")
+	local percent = CreateFrame("Frame", nil, resultsFrame, "MinimalSliderWithSteppersTemplate")
+	percent:SetSize(220, 20)
+	percent:SetPoint("LEFT", percentLabel, "RIGHT", 12, 0)
+	percent:Init(Auctioneer:Setting("dealsMinDiscount"), 5, 90, (90 - 5) / 5,
+		{[MinimalSliderWithSteppersMixin.Label.Right] = function(value)
+			return format("%d%%", floor(value + 0.5))
+		end})
+	percent:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, value)
+		value = floor(value + 0.5)
 		if value ~= Auctioneer:Setting("dealsMinDiscount") then
 			Auctioneer:SetSetting("dealsMinDiscount", value)
+			resultsFrame.offset = 0
+			redisplay()
 		end
-		redisplay()
-	end)
+	end, resultsFrame)
+	resultsFrame.percent = percent
 	-- The settings page changes the same value: pick it up whenever the panel shows.
 	resultsFrame:HookScript("OnShow", function()
-		local value = Auctioneer:Setting("dealsMinDiscount")
-		if floor(percent:GetValue() + 0.5) ~= value then
-			percent:SetValue(value)
-		end
+		percent:SetValue(Auctioneer:Setting("dealsMinDiscount"))
 	end)
-	percent:SetScript("OnMouseWheel", function(slider, delta)
-		local low, high = slider:GetMinMaxValues()
-		slider:SetValue(math.min(high, math.max(low, slider:GetValue() + delta * 5)))
-	end)
-	percent:SetScript("OnEnter", function(slider)
-		GameTooltip:SetOwner(slider, "ANCHOR_TOP")
+	local function percentTooltip(owner)
+		GameTooltip:SetOwner(owner, "ANCHOR_TOP")
 		GameTooltip:SetText("Minimum discount")
 		GameTooltip:AddLine(format("Show listings at least %d%% below what a vendor pays, or below the item's usual auction price.",
-			floor(slider:GetValue() + 0.5)), 1, 1, 1, true)
-		GameTooltip:AddLine("Drag or use the mouse wheel.", 0.6, 0.6, 0.6, true)
+			Auctioneer:Setting("dealsMinDiscount")), 1, 1, 1, true)
 		GameTooltip:Show()
-	end)
-	percent:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-	local discount = Auctioneer:Setting("dealsMinDiscount")
-	percent:SetValue(discount)
-	percentText:SetText(discount.."%")
-	updateFill()
-
-	local function lineReset(self)
-		self.item = nil
-		self.bg:SetVertexColor(0.1, 0.1, 0.1)
-		self.name:SetText("")
-		self.money:Set()
+	end
+	if percent.Slider then
+		percent.Slider:HookScript("OnEnter", percentTooltip)
+		percent.Slider:HookScript("OnLeave", GameTooltip_Hide)
 	end
 
-	local function lineMoney(self, money)
-		self.money:Set(money)
+	-- The list, laid out like the auction house's Browse list: a header row, then rows
+	-- with the item's icon and name, what kind of deal it is, and the profit.
+	local ROW_HEIGHT, HEADER_HEIGHT = 20, 20
+	local PROFIT_WIDTH, KIND_WIDTH = 120, 56
+	local LEFT, RIGHT = 6, -22 -- room on the right for the scroll bar
+
+	local header = CreateFrame("Frame", nil, inset)
+	header:SetPoint("TOPLEFT", inset, "TOPLEFT", LEFT - 2, -4)
+	header:SetPoint("RIGHT", inset, "RIGHT", RIGHT + 2, 0)
+	header:SetHeight(HEADER_HEIGHT)
+	local headerBg = header:CreateTexture(nil, "BACKGROUND")
+	headerBg:SetColorTexture(0, 0, 0, 0.45)
+	headerBg:SetAllPoints(header)
+	local headerRule = header:CreateTexture(nil, "ARTWORK")
+	headerRule:SetColorTexture(1, 0.82, 0, 0.35)
+	headerRule:SetHeight(1)
+	headerRule:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", 0, 0)
+	headerRule:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", 0, 0)
+	local function headerText(text, justify)
+		local label = header:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		label:SetJustifyH(justify)
+		label:SetText(text)
+		return label
+	end
+	local nameHeader = headerText("Name", "LEFT")
+	nameHeader:SetPoint("LEFT", header, "LEFT", 6, 0)
+	local profitHeader = headerText("Profit", "RIGHT")
+	profitHeader:SetPoint("RIGHT", header, "RIGHT", -4, 0)
+	local kindHeader = headerText("Deal", "LEFT")
+	kindHeader:SetPoint("RIGHT", header, "RIGHT", -PROFIT_WIDTH - KIND_WIDTH + 30, 0)
+	kindHeader:SetWidth(KIND_WIDTH)
+	resultsFrame.header = header
+
+	local function lineReset(line)
+		line.item, line.deal = nil, nil
+		line.icon:Hide()
+		line.name:SetText("")
+		line.kind:SetText("")
+		line.money:Set()
+		line:Hide()
 	end
 
-	local function lineVendor(self, set)
-		if set then
-			self.bg:SetVertexColor(1, 0.8, 0)
-		else
-			self.bg:SetVertexColor(0.1, 0.1, 0.1)
-		end
+	local KIND = {vendor = "Vendor", arbitrage = "Resell"}
+	local function lineDeal(line, deal)
+		local item, _, kind, profit = unpack(deal)
+		local info = item:Info()
+		line.item, line.deal = item, deal
+		line.icon:SetTexture(info.icon)
+		line.icon:SetShown(info.icon ~= nil)
+		line.name:SetText("|c"..info.color..info.name.."|r")
+		line.kind:SetText(KIND[kind] or "")
+		line.money:Set(profit)
+		line:Show()
 	end
 
 	local function lineClick(self)
@@ -338,75 +322,93 @@ function Module:CreateResults()
 		end)
 	end
 
-	local ofs = 4
-	local lines = {}
-	local prev
-	for i=0,35 do
-		local line = CreateFrame("Button", nil, resultsFrame)
-		if i == 0 then
-			line:SetPoint("TOPLEFT", inset, "TOPLEFT", 5, 12)
-			line:SetPoint("BOTTOMRIGHT", inset, "TOPRIGHT", -20, 0)
+	-- Hovering a row shows the item and the deal: what it costs and why it is one.
+	local function lineEnter(line)
+		local deal = line.deal
+		if not deal then return end
+		local item, price, kind, profit, points, discount = unpack(deal)
+		local info = item:Info()
+		GameTooltip:SetOwner(line, "ANCHOR_RIGHT")
+		if info.link then
+			GameTooltip:SetHyperlink(info.link)
 		else
-			line:SetPoint("TOPLEFT", prev.name, "BOTTOMLEFT", 0, 0 - ofs)
-			line:SetPoint("RIGHT", inset, "RIGHT", -20, 0)
-			line:SetHeight(13)
-			ofs = 0
+			GameTooltip:SetItemByID(item:ID())
+		end
+		GameTooltip:AddLine(" ")
+		local money = function(copper) return GetMoneyString(copper, true) end
+		GameTooltip:AddDoubleLine("Listed at", money(price), 1, 0.82, 0, 1, 1, 1)
+		if kind == "vendor" then
+			GameTooltip:AddDoubleLine("Sell to a vendor for", money(price + profit), 1, 0.82, 0, 1, 1, 1)
+		else
+			GameTooltip:AddDoubleLine(format("Usual price (%d scans)", points or 0),
+				money(math.floor(price / math.max(0.01, 1 - discount) + 0.5)), 1, 0.82, 0, 1, 1, 1)
+		end
+		GameTooltip:AddDoubleLine("Profit", money(profit), 1, 0.82, 0, 0.25, 1, 0.25)
+		GameTooltip:AddLine("Click to find it on the Buy tab.", 0.6, 0.6, 0.6)
+		GameTooltip:Show()
+	end
+
+	local lines = {}
+	local function makeLine(i)
+		local line = CreateFrame("Button", nil, inset)
+		line:SetHeight(ROW_HEIGHT)
+		line:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 2, -(i - 1) * ROW_HEIGHT - 2)
+		line:SetPoint("RIGHT", header, "RIGHT", -2, 0)
+		if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo("auctionhouse-ui-row-highlight") then
+			line:SetHighlightAtlas("auctionhouse-ui-row-highlight", "ADD")
+		else
+			line:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
 		end
 
 		line.Reset = lineReset
-		line.SetMoney = lineMoney
-		line.SetVendor = lineVendor
+		line.SetDeal = lineDeal
 		line:SetScript("OnClick", lineClick)
+		line:SetScript("OnEnter", lineEnter)
+		line:SetScript("OnLeave", GameTooltip_Hide)
 
-		local linebg = line:CreateTexture(nil, "BACKGROUND")
-		linebg:SetTexture("Interface\\TARGETINGFRAME\\UI-StatusBar")
-		linebg:SetAllPoints(true)
-		line.bg = linebg
+		local icon = line:CreateTexture(nil, "ARTWORK")
+		icon:SetSize(ROW_HEIGHT - 4, ROW_HEIGHT - 4)
+		icon:SetPoint("LEFT", line, "LEFT", 4, 0)
+		line.icon = icon
 
-		local name = line:CreateFontString(nil, "OVERLAY")
-		name:SetFont("Fonts\\ARIALN.TTF", 12, "OUTLINE")
+		local money = Auctioneer.GUI:MoneyView(line)
+		local moneyFrame = money:Frame()
+		moneyFrame:SetPoint("RIGHT", line, "RIGHT", -2, 0)
+		line.money = money
+
+		local kind = line:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		kind:SetPoint("RIGHT", line, "RIGHT", -PROFIT_WIDTH - KIND_WIDTH + 28, 0)
+		kind:SetWidth(KIND_WIDTH)
+		kind:SetJustifyH("LEFT")
+		kind:SetTextColor(0.7, 0.7, 0.7)
+		line.kind = kind
+
+		local name = line:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		name:SetPoint("LEFT", icon, "RIGHT", 6, 0)
+		name:SetPoint("RIGHT", kind, "LEFT", -6, 0)
 		name:SetJustifyH("LEFT")
 		name:SetWordWrap(false)
-		name:SetPoint("TOPLEFT", line, "TOPLEFT", 0, 0)
-		if i == 0 then
-			name:SetText("Item")
-			name:SetTextColor(0.6, 0.6, 0.6)
-			linebg:Hide()
-		end
 		line.name = name
 
-		if i == 0 then
-			local profit = line:CreateFontString(nil, "OVERLAY")
-			profit:SetFont("Fonts\\ARIALN.TTF", 12, "OUTLINE")
-			profit:SetJustifyH("RIGHT")
-			profit:SetWordWrap(false)
-			profit:SetPoint("TOPLEFT", name, "TOPRIGHT", 0, 0)
-			profit:SetPoint("BOTTOMRIGHT", line, "BOTTOMRIGHT", 0, 0)
-			profit:SetText("Profit")
-			profit:SetTextColor(0.6, 0.6, 0.6)
-			line.profit = profit
+		line:Reset()
+		lines[i] = line
+		return line
+	end
 
-			name:SetPoint("BOTTOMRIGHT", line, "BOTTOMRIGHT", -130, 0)
-		else
-			local money = Auctioneer.GUI:MoneyView(line)
-			local moneyFrame = money:Frame()
-			moneyFrame:SetPoint("RIGHT", line, "RIGHT", 0, 0)
-			line.money = money
-
-			name:SetPoint("BOTTOMRIGHT", line, "BOTTOMRIGHT", -moneyFrame:GetWidth(), 0)
-
-			line:Reset()
+	-- How many rows fit in the inset below the header; rows are made as needed.
+	function resultsFrame:RowsThatFit()
+		local height = (inset:GetHeight() or 0) - HEADER_HEIGHT - 10
+		local count = math.max(1, math.floor(height / ROW_HEIGHT))
+		for i = #lines + 1, count do
+			makeLine(i)
 		end
-
-		if i == 0 then
-			resultsFrame.header = lines
-		else
-			lines[i] = line
-		end
-
-		prev = line
+		return count
 	end
 	resultsFrame.lines = lines
+
+	scroll.frame:ClearAllPoints()
+	scroll.frame:SetPoint("TOPRIGHT", inset, "TOPRIGHT", -5, -HEADER_HEIGHT - 8)
+	scroll.frame:SetPoint("BOTTOMRIGHT", inset, "BOTTOMRIGHT", -5, 6)
 
 	resultsFrame:Hide()
 end
