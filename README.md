@@ -29,7 +29,8 @@ To update, do the same with a newer zip.
   (hover it to see when the last scan was). Auctioneer never searches on a timer.
 - **Tooltips:** item tooltips show the prices from your scans.
 - **Deal finder:** after a scan, a panel next to the auction house lists items posted
-  below their usual price.
+  below their usual price or below what a vendor pays. Hover a row for the numbers behind
+  the deal; click it to find the item on the Buy tab.
 - **Selling:** on the **Sell** tab, put an item in the slot. The **Valuer** panel shows
   its price history (with when it was last seen at auction) and a **vendor check**: whether the auction pays more than a vendor
   after the auction house's 5% cut, the deposit you lose if it doesn't sell, and the
