@@ -86,7 +86,14 @@ function Module:SellItemLoaded(itemType, itemLocation)
 	-- Shown again once item key info arrives: the same item, maybe with its variant's key now.
 	local reloaded = self.current and self.current.itemLocation == itemLocation and
 		(not Module.SameKey or Module.SameKey(self.current.item.itemKey, itemKey))
+	local previous = self.current
 	self.current = {item = item, info = info, name = name, listKey = listKey, itemLocation = itemLocation}
+	if reloaded then
+		-- Same item: keep whether you typed a price and what was undercut.
+		self.current.typed = previous.typed
+		self.current.undercut = previous.undercut
+		self.current.undercutDone = previous.undercutDone
+	end
 	if not reloaded and self.ExactItemLoaded then
 		-- Exact.lua: list this exact variant's auctions (only once per item placed).
 		self:ExactItemLoaded(self.current, itemType, listKey)
@@ -223,6 +230,19 @@ function Module.VendorNumbers(vendorPrice, unitPrice, quantity)
 	}
 end
 
+-- `price` lowered by your undercut. Item buyouts are whole silver, so an item's price is
+-- rounded down to one (at least 1 silver); commodities take any copper (at least 1).
+function Module.Undercut(price, undercut, wholeSilver)
+	if not price or not undercut or undercut <= 0 then
+		return price
+	end
+	local lowered = price - undercut
+	if wholeSilver then
+		return math.max(100, math.floor(lowered / 100) * 100)
+	end
+	return math.max(1, lowered)
+end
+
 function Module:ActiveSellFrame()
 	if not AuctionHouseFrame then return end
 	for _, frame in ipairs({AuctionHouseFrame.CommoditiesSellFrame, AuctionHouseFrame.ItemSellFrame}) do
@@ -244,7 +264,82 @@ function Module:HookSellFrames()
 					Module:Render(sellFrame)
 				end
 			end)
+			-- Blizzard picks the cheapest listing's price as results arrive: undercut it.
+			if frame.UpdatePriceSelection then
+				hooksecurefunc(frame, "UpdatePriceSelection", function(sellFrame)
+					Module:UndercutBlizzard(sellFrame)
+				end)
+			end
+			-- Typing in the price boxes (not Blizzard or Auctioneer setting them).
+			local moneyInput = frame.PriceInput and frame.PriceInput.MoneyInputFrame
+			for _, boxName in ipairs({"GoldBox", "SilverBox", "CopperBox"}) do
+				local box = moneyInput and moneyInput[boxName]
+				if box and box.HookScript then
+					box:HookScript("OnTextChanged", function(_, userInput)
+						if userInput then Module:PriceTyped() end
+					end)
+				end
+			end
 		end
+	end
+end
+
+function Module:PriceTyped()
+	if self.current then
+		self.current.typed = true
+		self.current.undercut = nil
+	end
+	if self.ExactTyped then self:ExactTyped() end
+end
+
+-- The cheapest listing in Blizzard's sell list, as price per item, and whether it is yours.
+local function cheapestListing(sellFrame, itemLocation)
+	if sellFrame == AuctionHouseFrame.CommoditiesSellFrame then
+		local itemID = C_Item.GetItemID(itemLocation)
+		local result = itemID and C_AuctionHouse.GetNumCommoditySearchResults(itemID) > 0 and
+			C_AuctionHouse.GetCommoditySearchResultInfo(itemID, 1)
+		if result then
+			return result.unitPrice, result.containsOwnerItem, false
+		end
+		return
+	end
+	if not (AuctionHouseUtil and AuctionHouseUtil.ConvertItemSellItemKey) then return end
+	local itemKey = C_AuctionHouse.GetItemKeyFromItem(itemLocation)
+	local listKey = itemKey and AuctionHouseUtil.ConvertItemSellItemKey(itemKey)
+	local result = listKey and C_AuctionHouse.GetNumItemSearchResults(listKey) > 0 and
+		C_AuctionHouse.GetItemSearchResultInfo(listKey, 1)
+	if result and result.buyoutAmount then
+		local quantity = math.max(result.quantity or 1, 1)
+		return math.floor(result.buyoutAmount / quantity), result.containsOwnerItem, true
+	end
+end
+
+-- After Blizzard sets the price to the cheapest listing, lower it by the undercut setting.
+-- Once per item placed; never over a price you typed, never under your own auction,
+-- and not for suffix items the exact match prices (Exact.lua undercuts those itself).
+function Module:UndercutBlizzard(sellFrame)
+	local undercut = Auctioneer:Setting("undercutCopper") or 0
+	local current = self.current
+	if undercut <= 0 or not current or current.undercutDone or current.typed or self.exact then
+		return
+	end
+	if not sellFrame:IsShown() then return end
+	local itemLocation = sellFrame:GetItem()
+	if not itemLocation or not itemLocation:IsValid() then return end
+	local cheapest, mine, wholeSilver = cheapestListing(sellFrame, itemLocation)
+	if not cheapest or cheapest <= 0 then return end
+	local price = sellFrame.PriceInput:GetAmount()
+	if price ~= cheapest then
+		-- Blizzard has not picked this listing (yet), or the price is another one.
+		return
+	end
+	current.undercutDone = true
+	if mine then return end
+	local lowered = Module.Undercut(cheapest, undercut, wholeSilver)
+	if lowered and lowered < cheapest then
+		current.undercut = cheapest - lowered
+		sellFrame.PriceInput:SetAmount(lowered)
+		sellFrame:UpdatePostState()
 	end
 end
 
@@ -288,6 +383,10 @@ function Module:AddVendorCheck(lines, sellFrame)
 	addMoney(lines, " - auction pays, after 5% cut", n.auction)
 	addMoney(lines, " - deposit, lost if unsold", sellFrame:GetDepositAmount() or 0)
 	addMoney(lines, " - beats vendor at, per item", n.breakEven)
+	local undercut = self.current and self.current.undercut
+	if undercut and undercut > 0 then
+		addMoney(lines, " - undercut, already in the price", undercut)
+	end
 
 	if price > 0 then
 		lines:AddSingleLine(4)

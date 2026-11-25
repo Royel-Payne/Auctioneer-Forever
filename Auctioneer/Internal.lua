@@ -136,6 +136,7 @@ Internal.settingDefaults = {
 	sellSlotSwap = true,       -- a new sell item leaves the old one in the bags
 	vendorCheck = true,        -- vendor check in the Valuer
 	exactMatch = true,         -- suffix items: list and price only the exact variant
+	undercutCopper = 0,        -- copper taken off the cheapest listing when pricing a sale
 	staleHours = 6,            -- price history older than this shows orange (1-48)
 }
 

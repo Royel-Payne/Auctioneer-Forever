@@ -46,10 +46,12 @@ end
 -- What counts as a deal. A listing is a deal when it is well below what a vendor
 -- pays, or well below what the item usually sells for, and buying it makes real money:
 --   vendor deal: profit = vendor price - listing price
---   market deal: profit = usual price after the 5% auction cut - listing price
+--   market deal: profit = usual price, less your undercut, after the 5% auction cut
+--                - listing price
 -- "Usual price" is the median of past scans (not this one), and needs enough of them.
 -- The minimum discount and profit are settings (dealsMinDiscount, dealsMinProfitCopper),
--- applied when the list is shown, so changing them needs no new scan.
+-- applied when the list is shown, so changing them needs no new scan. So is the undercut
+-- (undercutCopper): reselling, you would post that much under the usual price.
 local AUCTION_CUT = 0.05
 local MIN_PROFIT = 100        -- default for Evaluate: 1 silver
 local MIN_DATA_POINTS = 6     -- scans of an item before its usual price is trusted
@@ -68,8 +70,8 @@ local function usualPrice(stats, options)
 end
 
 -- The deal a listing offers, or nil. Returns kind, profit, discount (0-1), points.
--- minProfit in copper, default 1 silver.
-function Module.Evaluate(itemPrice, vendorPrice, usual, points, minProfit)
+-- minProfit in copper, default 1 silver. undercut: copper below `usual` you would resell at.
+function Module.Evaluate(itemPrice, vendorPrice, usual, points, minProfit, undercut)
 	minProfit = math.max(1, minProfit or MIN_PROFIT)
 	local best
 	if vendorPrice and vendorPrice > 0 then
@@ -79,7 +81,8 @@ function Module.Evaluate(itemPrice, vendorPrice, usual, points, minProfit)
 		end
 	end
 	if usual and usual > 0 then
-		local profit = math.floor(usual * (1 - AUCTION_CUT)) - itemPrice
+		local resale = math.max(0, usual - math.max(0, undercut or 0))
+		local profit = math.floor(resale * (1 - AUCTION_CUT)) - itemPrice
 		if profit >= minProfit and (not best or profit > best[2]) then
 			best = {"arbitrage", profit, (usual - itemPrice) / usual, points}
 		end
@@ -104,8 +107,9 @@ function Module:ScannerItemsCompleted(items, auto)
 		-- Keep every profitable listing; Display applies the minimum profit setting.
 		local kind, profit, discount, dataPoints = Module.Evaluate(itemPrice, item:VendorPrice(), usual, points, 1)
 		if kind then
-			-- item, price, kind, profit, data points, discount
-			tinsert(deals, {item, itemPrice, kind, profit, dataPoints, discount})
+			-- item, price, kind, profit, data points, discount; vendor and usual price for
+			-- evaluating again with the undercut when shown
+			tinsert(deals, {item, itemPrice, kind, profit, dataPoints, discount, item:VendorPrice(), usual, points})
 		end
 	end
 	table.sort(deals, function(a, b) return a[4] > b[4] end)
@@ -128,11 +132,20 @@ function Module:Display()
 	local percent = floor(resultsFrame.percent:GetValue() + 0.5) / 100
 
 	local minProfit = Auctioneer:Setting("dealsMinProfitCopper") or 100
+	local undercut = Auctioneer:Setting("undercutCopper") or 0
 	local list = {}
 	for _, deal in ipairs(self.deals) do
-		if deal[6] >= percent and deal[4] >= minProfit then
-			tinsert(list, deal)
+		local item, itemPrice = deal[1], deal[2]
+		local kind, profit, discount, points = deal[3], deal[4], deal[6], deal[5]
+		if undercut > 0 then
+			kind, profit, discount, points = Module.Evaluate(itemPrice, deal[7], deal[8], deal[9], 1, undercut)
 		end
+		if kind and discount >= percent and profit >= minProfit then
+			tinsert(list, {item, itemPrice, kind, profit, points, discount})
+		end
+	end
+	if undercut > 0 then
+		table.sort(list, function(a, b) return a[4] > b[4] end)
 	end
 
 	local scroll = resultsFrame.scroll

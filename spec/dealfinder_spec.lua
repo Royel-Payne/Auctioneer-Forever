@@ -77,6 +77,13 @@ describe("DealFinder", function()
 			assert.are.equal(8, points)
 		end)
 
+		it("counts the undercut in a market deal's resale, not in a vendor deal", function()
+			local kind, profit = finder.Evaluate(5000, nil, 10000, 8, 1, 1000)
+			assert.are.equal("arbitrage", kind)
+			assert.are.equal(3550, profit)
+			assert.are.equal(2000, select(2, finder.Evaluate(1000, 3000, nil, nil, 1, 1000)))
+		end)
+
 		it("is not a market deal when the cut eats the margin", function()
 			assert.is_nil(finder.Evaluate(9900, nil, 10000, 8))
 		end)

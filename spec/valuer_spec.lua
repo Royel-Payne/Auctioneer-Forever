@@ -112,6 +112,22 @@ describe("Valuer", function()
 			assert.are.same({nil, "typed"}, {valuer.ExactPrice(rows, 5000, true)})
 		end)
 
+		it("undercuts the cheapest listing, but not your own", function()
+			local rows = {{buyout = 2000}, {buyout = 2500}}
+			assert.are.same({1900, "listing"}, {valuer.ExactPrice(rows, nil, false, 50)})
+			assert.are.same({2000, "listing"}, {valuer.ExactPrice(rows, nil, false, 0)})
+			assert.are.same({2000, "mine"}, {valuer.ExactPrice({{buyout = 2000, mine = true}}, nil, false, 50)})
+			assert.are.same({5000, "history"}, {valuer.ExactPrice({}, 4987, false, 50)})
+		end)
+
+		it("rounds an item's undercut price down to whole silver, commodities to copper", function()
+			assert.are.equal(1900, valuer.Undercut(2000, 5, true))
+			assert.are.equal(1995, valuer.Undercut(2000, 5, false))
+			assert.are.equal(100, valuer.Undercut(150, 500, true))
+			assert.are.equal(1, valuer.Undercut(150, 500, false))
+			assert.are.equal(2000, valuer.Undercut(2000, 0, true))
+		end)
+
 		it("rounds a history price to whole silver, at least one", function()
 			assert.are.equal(500, valuer.WholeSilver(451))
 			assert.are.equal(100, valuer.WholeSilver(3))

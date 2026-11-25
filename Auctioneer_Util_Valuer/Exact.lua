@@ -63,13 +63,17 @@ end
 
 -- The price to set, and why, or nil to leave the price alone. `typed` is whether the
 -- price in the sell frame is one you entered rather than Blizzard's automatic one.
-function Module.ExactPrice(rows, historyPrice, typed)
+-- The cheapest listing is undercut by `undercut`, unless that listing is yours.
+function Module.ExactPrice(rows, historyPrice, typed, undercut)
 	if typed then
 		return nil, "typed"
 	end
 	for _, row in ipairs(rows) do
 		if row.buyout and row.buyout > 0 then
-			return row.buyout, "listing"
+			if row.mine then
+				return row.buyout, "mine"
+			end
+			return Module.Undercut(row.buyout, undercut, true), "listing"
 		end
 	end
 	if historyPrice and historyPrice > 0 then
@@ -148,9 +152,13 @@ function Module:ExactResults(itemKey)
 		local sellFrame = itemSellFrame()
 		if sellFrame and sellFrame:IsShown() then
 			local price, why = Module.ExactPrice(exact.rows, historyPrice(exact.item),
-				exact.typed)
+				exact.typed, Auctioneer:Setting("undercutCopper"))
 			exact.state = why
 			if price then
+				if why == "listing" then
+					exact.undercut = exact.rows[1].buyout - price
+				end
+				if self.current then self.current.undercut = exact.undercut end
 				self:ExactSetPrice(price)
 			end
 		end
@@ -217,6 +225,8 @@ function Module:ExactCreate(parent, detail)
 		row:SetScript("OnClick", function(button)
 			if button.data and button.data.buyout then
 				Module.exact.state = "clicked"
+				Module.exact.undercut = nil
+				if Module.current then Module.current.undercut = nil end
 				Module:ExactSetPrice(button.data.buyout)
 				Module:ExactRender()
 			end
@@ -247,6 +257,8 @@ end
 
 local STATUS = {
 	searching = "Searching the auction house for this exact item...",
+	undercut = "|cff40ff40Price set %s below the cheapest of these.|r\n|cff999999Blizzard's list on the left mixes in every variant.|r",
+	mine = "|cff40ff40The cheapest is yours: price set to match it.|r",
 	listing = "|cff40ff40Price set to the cheapest of these.|r\n|cff999999Blizzard's list on the left mixes in every variant.|r",
 	clicked = "|cff40ff40Price set to the row you clicked.|r",
 	history = "|cffff9933None listed: price set from this item's price history.|r",
@@ -267,6 +279,9 @@ function Module:ExactRender()
 
 	local rows = exact.rows or {}
 	local status = STATUS[exact.state] or ""
+	if exact.state == "listing" and (exact.undercut or 0) > 0 then
+		status = format(STATUS.undercut, money(exact.undercut))
+	end
 	if exact.state ~= "searching" and #rows > 0 then
 		status = format("%d listed. %s", #rows, status)
 		if exact.full == false then
@@ -299,7 +314,7 @@ function Module:ExactHide()
 	end
 end
 
--- Wire up: search results, and typing in the sell frame's price boxes.
+-- Wire up: search results. (Main.lua tells us when you type a price.)
 function Module:ExactBoot()
 	local events = CreateFrame("Frame")
 	events:RegisterEvent("ITEM_SEARCH_RESULTS_UPDATED")
@@ -307,15 +322,4 @@ function Module:ExactBoot()
 	events:SetScript("OnEvent", function(_, _, itemKey)
 		Module:ExactResults(itemKey)
 	end)
-
-	local sellFrame = itemSellFrame()
-	local moneyInput = sellFrame and sellFrame.PriceInput and sellFrame.PriceInput.MoneyInputFrame
-	for _, boxName in ipairs({"GoldBox", "SilverBox", "CopperBox"}) do
-		local box = moneyInput and moneyInput[boxName]
-		if box and box.HookScript then
-			box:HookScript("OnTextChanged", function(_, userInput)
-				if userInput then Module:ExactTyped() end
-			end)
-		end
-	end
 end
