@@ -118,7 +118,7 @@ function Module:ScannerItemsCompleted(items, auto)
 	if (auto or not Auctioneer:Setting("dealsOpenAfterScan")) and not resultsFrame:IsShown() then
 		return
 	end
-	resultsFrame.scroll:SetValue(1)
+	resultsFrame.offset = 0
 	self:Display()
 end
 
@@ -148,22 +148,10 @@ function Module:Display()
 		table.sort(list, function(a, b) return a[4] > b[4] end)
 	end
 
-	local scroll = resultsFrame.scroll
-	if #list > 35 then
-		local limit = #list - 34
-		scroll:SetMinMaxValues(1, limit)
-		if scroll:GetValue() > limit then
-			scroll:SetValue(limit)
-		end
-		scroll:Enable()
-		scroll:Show()
-	else
-		scroll:SetValue(1)
-		scroll:Disable()
-		scroll:Hide()
-	end
-
-	local offset = floor(resultsFrame.scroll:GetValue() + 0.5) -1
+	-- 35 rows show at once; the first shown is resultsFrame.offset (0 = top).
+	local offset = math.max(0, math.min(resultsFrame.offset or 0, #list - 35))
+	resultsFrame.offset = offset
+	resultsFrame.scroll:Set(#list, 35, offset)
 	resultsFrame.percentText:SetText(floor(percent*100).."%")
 
 	local lines = {}
@@ -221,39 +209,21 @@ function Module:CreateResults()
 		self:Display()
 	end
 
-	local function wheelValue(slider)
-		return function(_, delta)
-			if slider:IsEnabled() then
-				local value = slider:GetValue() - delta
-				local _, max = slider:GetMinMaxValues()
-				if value >= -100 and value <= max then
-					slider:SetValue(value)
-				end
-			end
-		end
-	end
-
-	local scroll = CreateFrame("Slider", "AuctioneerDealFinderScroll", inset, "OptionsSliderTemplate")
-	scroll:SetOrientation("VERTICAL")
-	scroll:SetPoint("TOPRIGHT", inset, "TOPRIGHT")
-	scroll:SetPoint("BOTTOMRIGHT", inset, "BOTTOMRIGHT")
-	scroll:SetWidth(16)
-	scroll:SetMinMaxValues(1, 1000)
-	scroll:SetValue(0)
-	scroll:SetValueStep(1)
-	scroll:SetThumbTexture("Interface\\Buttons\\UI-ScrollBar-Knob")
-	scroll:SetScript("OnValueChanged", redisplay)
-	scroll:Disable()
-	scroll:Hide()
+	-- The auction house lists' own scroll bar, and the mouse wheel anywhere on the list.
+	resultsFrame.offset = 0
+	local scroll = Auctioneer.GUI:ScrollBar(inset, function(offset)
+		resultsFrame.offset = offset
+		redisplay()
+	end)
+	scroll.frame:SetPoint("TOPRIGHT", inset, "TOPRIGHT", -5, -6)
+	scroll.frame:SetPoint("BOTTOMRIGHT", inset, "BOTTOMRIGHT", -5, 6)
+	resultsFrame.scroll = scroll
 
 	inset:EnableMouse(true)
-	inset:SetScript("OnMouseWheel", wheelValue(scroll))
-
-	local scrollName = scroll:GetName()
-	_G[scrollName.."Low"]:SetText("")
-	_G[scrollName.."High"]:SetText("")
-	_G[scrollName.."Text"]:SetText("")
-	resultsFrame.scroll = scroll
+	inset:SetScript("OnMouseWheel", function(_, delta)
+		resultsFrame.offset = math.max(0, (resultsFrame.offset or 0) - delta)
+		redisplay()
+	end)
 
 	-- Minimum discount: gold label, slider with a gold fill up to the thumb, value.
 	local percentLabel = resultsFrame:CreateFontString(nil, "OVERLAY")
@@ -272,7 +242,7 @@ function Module:CreateResults()
 	percent:SetObeyStepOnDrag(true)
 	resultsFrame.percent = percent
 
-	scrollName = percent:GetName()
+	local scrollName = percent:GetName()
 	_G[scrollName.."Low"]:SetText("")
 	_G[scrollName.."High"]:SetText("")
 	_G[scrollName.."Text"]:SetText("")

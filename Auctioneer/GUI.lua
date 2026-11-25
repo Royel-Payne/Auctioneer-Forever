@@ -478,3 +478,67 @@ function lines:AddMoneyLine(size, font, noGraphic, showCopper)
 	GUIMoneyLine = moneyLine
 	return moneyLine
 end
+
+-- A scroll bar like the auction house lists' own (Blizzard's MinimalScrollBar: a thin
+-- track, a thumb and an arrow at each end), for a list of rows we draw ourselves.
+-- bar:Set(total, visible, offset) after drawing the list; onScroll(offset) is called when
+-- you drag, click or wheel it to another first row. Hidden while everything fits.
+-- bar.frame is the frame to anchor. A plain thin slider stands in if the template is missing.
+function GUI.Components:ScrollBar(parent, onScroll)
+	local control = {offset = 0}
+	local range, updating = 0, false
+	local function moved(offset)
+		offset = math.max(0, math.min(range, offset))
+		if updating or offset == control.offset then return end
+		control.offset = offset
+		onScroll(offset)
+	end
+
+	local ok, bar = pcall(CreateFrame, "EventFrame", nil, parent, "MinimalScrollBar")
+	if ok and bar and bar.SetScrollPercentage and bar.RegisterCallback then
+		bar:RegisterCallback("OnScroll", function(_, percent)
+			if range > 0 then moved(math.floor(percent * range + 0.5)) end
+		end, control)
+		function control:Set(total, visible, offset)
+			range = math.max(0, total - visible)
+			self.offset = math.max(0, math.min(range, offset))
+			if range <= 0 then
+				bar:Hide()
+				return
+			end
+			updating = true
+			bar:SetVisibleExtentPercentage(visible / total)
+			bar:SetPanExtentPercentage(1 / range)
+			bar:SetScrollPercentage(self.offset / range, true)
+			updating = false
+			bar:Show()
+		end
+	else
+		bar = CreateFrame("Slider", nil, parent)
+		bar:SetOrientation("VERTICAL")
+		bar:SetWidth(8)
+		bar:SetValueStep(1)
+		bar:SetObeyStepOnDrag(true)
+		local track = bar:CreateTexture(nil, "BACKGROUND")
+		track:SetColorTexture(0, 0, 0, 0.5)
+		track:SetAllPoints(bar)
+		bar:SetThumbTexture("Interface\\Buttons\\UI-ScrollBar-Knob")
+		bar:SetScript("OnValueChanged", function(_, value) moved(math.floor(value + 0.5)) end)
+		function control:Set(total, visible, offset)
+			range = math.max(0, total - visible)
+			self.offset = math.max(0, math.min(range, offset))
+			if range <= 0 then
+				bar:Hide()
+				return
+			end
+			updating = true
+			bar:SetMinMaxValues(0, range)
+			bar:SetValue(self.offset)
+			updating = false
+			bar:Show()
+		end
+	end
+	bar:Hide()
+	control.frame = bar
+	return control
+end

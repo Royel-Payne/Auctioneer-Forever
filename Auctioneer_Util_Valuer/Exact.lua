@@ -15,7 +15,7 @@ local Module = private and private.Valuer
 if not Module then return end
 
 local ROWS, ROW_HEIGHT = 6, 16
-local SCROLL_WIDTH = 6 -- 6 rows leave room for the whole vendor check above; the wheel scrolls
+local SCROLL_WIDTH = 10 -- 6 rows leave room for the whole vendor check above; the wheel scrolls
 local LABEL_FONT = "Fonts\\FRIZQT__.TTF"
 local NUMBER_FONT = "Fonts\\ARIALN.TTF"
 
@@ -207,7 +207,12 @@ function Module:ExactCreate(parent, detail)
 			row:SetPoint("TOPLEFT", list.rows[i - 1], "BOTTOMLEFT", 0, 0)
 		end
 		row:SetPoint("RIGHT", list, "RIGHT", -SCROLL_WIDTH - 4, 0)
-		row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+		-- The auction house lists' own row highlight.
+		if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo("auctionhouse-ui-row-highlight") then
+			row:SetHighlightAtlas("auctionhouse-ui-row-highlight", "ADD")
+		else
+			row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+		end
 
 		row.price = row:CreateFontString(nil, "OVERLAY")
 		row.price:SetFont(NUMBER_FONT, 12, "OUTLINE")
@@ -238,30 +243,14 @@ function Module:ExactCreate(parent, detail)
 		list.rows[i] = row
 	end
 
-	-- A thin scroll bar beside the rows, shown when there are more auctions than rows:
-	-- drag the thumb, click the track, or use the mouse wheel anywhere on the list.
-	local bar = CreateFrame("Slider", nil, list)
-	bar:SetOrientation("VERTICAL")
-	bar:SetWidth(SCROLL_WIDTH)
-	bar:SetPoint("TOP", list.rows[1], "TOP", 0, 0)
-	bar:SetPoint("BOTTOM", list.rows[ROWS], "BOTTOM", 0, 0)
-	bar:SetPoint("RIGHT", list, "RIGHT", 0, 0)
-	bar:SetValueStep(1)
-	bar:SetObeyStepOnDrag(true)
-	local track = bar:CreateTexture(nil, "BACKGROUND")
-	track:SetTexture("Interface\\Buttons\\WHITE8X8")
-	track:SetVertexColor(1, 1, 1, 0.08)
-	track:SetAllPoints(bar)
-	bar:SetThumbTexture("Interface\\Buttons\\WHITE8X8")
-	bar.thumb = bar:GetThumbTexture()
-	bar.thumb:SetVertexColor(1, 0.82, 0, 0.6)
-	bar.thumb:SetWidth(SCROLL_WIDTH)
-	bar:SetScript("OnValueChanged", function(_, value)
-		if bar.updating then return end
-		list.offset = math.floor(value + 0.5)
+	-- The auction house lists' own scroll bar, beside the rows, when there are more
+	-- auctions than rows. The mouse wheel scrolls anywhere on the list.
+	local bar = Auctioneer.GUI:ScrollBar(list, function(offset)
+		list.offset = offset
 		Module:ExactRender()
 	end)
-	bar:Hide()
+	bar.frame:SetPoint("TOPLEFT", list.rows[1], "TOPRIGHT", 4, 0)
+	bar.frame:SetPoint("BOTTOMLEFT", list.rows[ROWS], "BOTTOMRIGHT", 4, 0)
 	list.bar = bar
 
 	list:EnableMouseWheel(true)
@@ -313,18 +302,7 @@ function Module:ExactRender()
 	list.status:SetText(status)
 
 	list.offset = math.max(0, math.min(list.offset, #rows - ROWS))
-	local bar = list.bar
-	if #rows > ROWS then
-		bar.updating = true
-		bar:SetMinMaxValues(0, #rows - ROWS)
-		bar:SetValue(list.offset)
-		bar.updating = false
-		-- The thumb's length shows how much of the list is in view.
-		bar.thumb:SetHeight(math.max(12, (bar:GetHeight() or 0) * ROWS / #rows))
-		bar:Show()
-	else
-		bar:Hide()
-	end
+	list.bar:Set(#rows, ROWS, list.offset)
 	for i, row in ipairs(list.rows) do
 		local data = rows[list.offset + i]
 		row.data = data

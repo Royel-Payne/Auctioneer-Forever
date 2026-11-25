@@ -19,6 +19,13 @@ function addon.boot(env, opts)
 	local Auctioneer = _G.Auctioneer
 	local gui = Auctioneer:Boot("GUI")
 	gui.Components = require("support.wow").null() -- widget constructors, e.g. GUI:MoneyView()
+	-- GUI:ScrollBar() (GUI.lua is not loaded): a bar that remembers what it was set to.
+	gui.Components.ScrollBar = function()
+		local null = require("support.wow").null
+		return {frame = null(), offset = 0, Set = function(self, total, visible, offset)
+			self.total, self.visible, self.offset = total, visible, offset
+		end}
+	end
 	gui.Money = function() end
 	local parts = gui._
 
