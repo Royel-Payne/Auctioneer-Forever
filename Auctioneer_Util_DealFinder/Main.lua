@@ -313,8 +313,9 @@ function Module:CreateResults()
 		GameTooltip:SetOwner(line, "ANCHOR_RIGHT")
 		if info.link then
 			GameTooltip:SetHyperlink(info.link)
-		else
-			GameTooltip:SetItemByID(item:ID())
+		elseif item.itemKey and item.itemKey.itemID then
+			-- item:ID() is Auctioneer's composite key, not an item ID.
+			GameTooltip:SetItemByID(item.itemKey.itemID)
 		end
 		GameTooltip:AddLine(" ")
 		local money = function(copper) return GetMoneyString(copper, true) end
