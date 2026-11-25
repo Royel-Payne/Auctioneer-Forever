@@ -400,7 +400,7 @@ end
 function Module:CreateFrame()
 	valuerFrame = Auctioneer.GUI:Panel("AuctioneerValuerFrame", "Valuer", "sell")
 	valuerFrame:SetPoint("TOPLEFT", AuctionHouseFrame, "TOPRIGHT", -2, 0)
-	valuerFrame:SetPoint("BOTTOMLEFT", AuctionHouseFrame, "BOTTOMRIGHT", -2, 5)
+	valuerFrame:SetPoint("BOTTOMLEFT", AuctionHouseFrame, "BOTTOMRIGHT", -2, 0)
 	valuerFrame:SetWidth(320)
 	valuerFrame.frames = {}
 

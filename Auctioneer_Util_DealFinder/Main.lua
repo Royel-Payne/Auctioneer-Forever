@@ -169,7 +169,7 @@ end
 function Module:CreateResults()
 	resultsFrame = Auctioneer.GUI:Panel("AuctioneerDealFinderFrame", "Deal finder", "browse", 34)
 	resultsFrame:SetPoint("TOPLEFT", AuctionHouseFrame, "TOPRIGHT", -2, 0)
-	resultsFrame:SetPoint("BOTTOMLEFT", AuctionHouseFrame, "BOTTOMRIGHT", -2, 5)
+	resultsFrame:SetPoint("BOTTOMLEFT", AuctionHouseFrame, "BOTTOMRIGHT", -2, 0)
 	resultsFrame:SetWidth(430)
 
 	local inset = resultsFrame.Inset
