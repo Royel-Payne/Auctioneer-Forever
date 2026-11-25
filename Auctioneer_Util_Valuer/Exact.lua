@@ -207,6 +207,7 @@ function Module:ExactCreate(parent, detail)
 			row:SetPoint("TOPLEFT", list.rows[i - 1], "BOTTOMLEFT", 0, 0)
 		end
 		row:SetPoint("RIGHT", list, "RIGHT", -SCROLL_WIDTH - 4, 0)
+		row.stripe = Auctioneer.GUI:RowStripe(row, i)
 		-- The auction house lists' own row highlight.
 		if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo("auctionhouse-ui-row-highlight") then
 			row:SetHighlightAtlas("auctionhouse-ui-row-highlight", "ADD")

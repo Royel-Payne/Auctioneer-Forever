@@ -398,31 +398,13 @@ function Module:AddVendorCheck(lines, sellFrame)
 end
 
 function Module:CreateFrame()
-	valuerFrame = CreateFrame("Frame", "AuctioneerValuerFrame", AuctionHouseFrame, "SimplePanelTemplate")
-	valuerFrame:SetPoint("TOPLEFT", AuctionHouseFrame, "TOPRIGHT", -2, -20)
+	valuerFrame = Auctioneer.GUI:Panel("AuctioneerValuerFrame", "Valuer", "sell")
+	valuerFrame:SetPoint("TOPLEFT", AuctionHouseFrame, "TOPRIGHT", -2, 0)
 	valuerFrame:SetPoint("BOTTOMLEFT", AuctionHouseFrame, "BOTTOMRIGHT", -2, 5)
 	valuerFrame:SetWidth(320)
 	valuerFrame.frames = {}
 
 	local inset = valuerFrame.Inset
-
-	local close = CreateFrame("Button", nil, valuerFrame, "UIPanelCloseButton")
-	close:SetPoint("TOPRIGHT", valuerFrame, "TOPRIGHT")
-	close:SetWidth(32)
-	close:SetHeight(32)
-	valuerFrame.close = close
-
-	local title = valuerFrame:CreateFontString(nil, "OVERLAY")
-	title:SetPoint("BOTTOM", inset, "TOP", 0, 3)
-	title:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
-	title:SetJustifyH("LEFT")
-	title:SetTextColor(1, 0.8, 0)
-	title:SetText("Valuer")
-
-	local bg = inset.Bg
-	bg:SetVertTile(false)
-	bg:SetHorizTile(false)
-	bg:SetAtlas("auctionhouse-background-buy-commodities-market", true)
 
 	local detail = CreateFrame("Frame", nil, inset)
 	detail:SetPoint("TOPLEFT", inset, "TOPLEFT", 5, -5)

@@ -542,3 +542,72 @@ function GUI.Components:ScrollBar(parent, onScroll)
 	control.frame = bar
 	return control
 end
+
+-- A panel beside the auction house, drawn like Blizzard's own frames: gold border, brown
+-- title bar and red close button (ButtonFrameTemplate, no portrait). `style` picks the
+-- background of the auction house list it sits beside: "sell" (the Sell tab's list) or
+-- "browse" (the Buy tab's results). `footer` leaves that much room under the inset.
+-- Falls back to the old SimplePanelTemplate if the client lacks the template.
+local PANEL_BACKGROUNDS = {
+	sell = {"auctionhouse-background-sell-right", "auctionhouse-background-summarylist"},
+	browse = {"auctionhouse-background-index", "auctionhouse-background-summarylist"},
+}
+local OLD_BACKGROUND = "auctionhouse-background-buy-commodities-market"
+
+local function hasAtlas(atlas)
+	return C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas) ~= nil
+end
+
+function GUI.Components:Panel(name, title, style, footer)
+	local ok, frame = pcall(CreateFrame, "Frame", name, AuctionHouseFrame, "ButtonFrameTemplate")
+	if ok and frame and frame.Inset then
+		if ButtonFrameTemplate_HidePortrait then ButtonFrameTemplate_HidePortrait(frame) end
+		if ButtonFrameTemplate_HideButtonBar then ButtonFrameTemplate_HideButtonBar(frame) end
+		if frame.SetTitle then
+			frame:SetTitle(title)
+		elseif frame.TitleText then
+			frame.TitleText:SetText(title)
+		end
+		frame.Inset:ClearAllPoints()
+		frame.Inset:SetPoint("TOPLEFT", frame, "TOPLEFT", 8, -26)
+		frame.Inset:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -6, footer or 6)
+	else
+		frame = CreateFrame("Frame", name, AuctionHouseFrame, "SimplePanelTemplate")
+		local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+		close:SetPoint("TOPRIGHT", frame, "TOPRIGHT")
+		close:SetSize(32, 32)
+		local text = frame:CreateFontString(nil, "OVERLAY")
+		text:SetPoint("BOTTOM", frame.Inset, "TOP", 0, 3)
+		text:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
+		text:SetTextColor(1, 0.8, 0)
+		text:SetText(title)
+	end
+
+	local bg = frame.Inset.Bg
+	if bg then
+		local atlas = OLD_BACKGROUND
+		for _, candidate in ipairs(PANEL_BACKGROUNDS[style] or {}) do
+			if hasAtlas(candidate) then
+				atlas = candidate
+				break
+			end
+		end
+		bg:SetVertTile(false)
+		bg:SetHorizTile(false)
+		bg:SetAtlas(atlas)
+	end
+	return frame
+end
+
+-- The faint alternating stripe of the Sell tab's list rows, on row `i`.
+function GUI.Components:RowStripe(row, i)
+	local stripe = row:CreateTexture(nil, "BACKGROUND")
+	stripe:SetAllPoints(row)
+	local atlas = i % 2 == 1 and "auctionhouse-rowstripe-1" or "auctionhouse-rowstripe-2"
+	if hasAtlas(atlas) then
+		stripe:SetAtlas(atlas)
+	else
+		stripe:SetColorTexture(1, 1, 1, i % 2 == 1 and 0.05 or 0.02)
+	end
+	return stripe
+end

@@ -19,6 +19,8 @@ function addon.boot(env, opts)
 	local Auctioneer = _G.Auctioneer
 	local gui = Auctioneer:Boot("GUI")
 	gui.Components = require("support.wow").null() -- widget constructors, e.g. GUI:MoneyView()
+	-- GUI:Panel() (GUI.lua is not loaded): a named frame, as the real one makes.
+	gui.Components.Panel = function(_, name) return _G.CreateFrame("Frame", name) end
 	-- GUI:ScrollBar() (GUI.lua is not loaded): a bar that remembers what it was set to.
 	gui.Components.ScrollBar = function()
 		local null = require("support.wow").null

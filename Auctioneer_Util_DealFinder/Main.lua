@@ -167,30 +167,12 @@ function Module:Display()
 end
 
 function Module:CreateResults()
-	resultsFrame = CreateFrame("Frame", "AuctioneerDealFinderFrame", AuctionHouseFrame, "SimplePanelTemplate")
-	resultsFrame:SetPoint("TOPLEFT", AuctionHouseFrame, "TOPRIGHT", -2, -20)
+	resultsFrame = Auctioneer.GUI:Panel("AuctioneerDealFinderFrame", "Deal finder", "browse", 34)
+	resultsFrame:SetPoint("TOPLEFT", AuctionHouseFrame, "TOPRIGHT", -2, 0)
 	resultsFrame:SetPoint("BOTTOMLEFT", AuctionHouseFrame, "BOTTOMRIGHT", -2, 5)
 	resultsFrame:SetWidth(430)
 
 	local inset = resultsFrame.Inset
-
-	local close = CreateFrame("Button", nil, resultsFrame, "UIPanelCloseButton")
-	close:SetPoint("TOPRIGHT", resultsFrame, "TOPRIGHT")
-	close:SetWidth(32)
-	close:SetHeight(32)
-	resultsFrame.close = close
-
-	local title = resultsFrame:CreateFontString(nil, "OVERLAY")
-	title:SetPoint("BOTTOM", inset, "TOP", 0, 3)
-	title:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
-	title:SetJustifyH("LEFT")
-	title:SetTextColor(1, 0.8, 0)
-	title:SetText("Deal finder")
-
-	local bg = inset.Bg
-	bg:SetVertTile(false)
-	bg:SetHorizTile(false)
-	bg:SetAtlas("auctionhouse-background-buy-commodities-market", true)
 
 	local function redisplay()
 		self:Display()
