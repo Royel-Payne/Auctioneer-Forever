@@ -18,6 +18,8 @@ local PUSH_FRAME_BUDGET_MS = 8
 
 -- Hook our method
 function Module:Boot(hook)
+	-- One time for all houses, from before lastFullScans was kept per house.
+	if AuctioneerData then AuctioneerData.lastFullScan = nil end
 	hook(Const.BrowseResultsAvailable, Module.BrowseResultsAvailable)
 	hook(Const.AuctionHouseOpened, Module.AuctionHouseOpened)
 	hook(Const.AuctionHouseClosed, Module.AuctionHouseClosed)

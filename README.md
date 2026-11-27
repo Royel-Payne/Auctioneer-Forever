@@ -28,6 +28,11 @@ To update, do the same with a newer zip.
   the search box, category and filters: the **Search** button then reads **Scan**
   (hover it to see when the last scan was). Auctioneer never searches on a timer.
 - **Tooltips:** item tooltips show the prices from your scans.
+- **Separate prices per auction house:** your faction's house and the neutral goblin
+  houses (Booty Bay, Gadgetzan, Everlook) keep separate prices, and so does each ruleset
+  (Normal, PvP, RP, RP-PvP). Each house is scanned on its own. Away from the auction
+  house, tooltips show your faction's house. Version .25 deleted the prices saved before
+  it, because they mixed every house together.
 - **Deal finder:** after a scan, a panel next to the auction house lists items posted
   below their usual price or below what a vendor pays. Hover a row for the numbers behind
   the deal; click it to find the item on the Buy tab.
@@ -73,6 +78,7 @@ the Forever client. This fork adds:
   Deal finder / Valuer bug fixes;
 - the vendor check, exact-name pricing for suffix items, the undercut, the Scan label
   and the sell-slot swap;
+- prices kept per auction house and ruleset;
 - a cleanup of files the game never loaded.
 
 Licensed under the GNU GPL v2, see [`LICENSE`](LICENSE).

@@ -57,6 +57,13 @@ describe("Stats:OverTime data per house", function()
 		assert.is_table(AuctioneerStatsOverTimeData["6931-Neutral"])
 	end)
 
+	it("drops the old scan time that was shared by every house", function()
+		local env = wow.install()
+		_G.AuctioneerData = {lastFullScan = 1795819914}
+		addon.boot(env, STATS)
+		assert.is_nil(AuctioneerData.lastFullScan)
+	end)
+
 	it("stores a scan at a goblin house under Neutral, not the player's faction", function()
 		local _, A = openAt(nil)
 		A.scan(addon.rows(3))
