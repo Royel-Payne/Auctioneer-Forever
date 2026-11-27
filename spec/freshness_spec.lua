@@ -24,22 +24,22 @@ describe("Freshness", function()
 			scanner.lastQueryFull = true
 			local before = GetServerTime()
 			A.scan(addon.rows(5))
-			local at = AuctioneerData.lastFullScan
+			local at = AuctioneerData.lastFullScans["6931-Horde"]
 			assert.is_truthy(at)
 			assert.is_true(at >= before and at <= GetServerTime())
 		end)
 
 		it("does not count a filtered search as a full scan", function()
-			AuctioneerData.lastFullScan = nil
+			AuctioneerData.lastFullScans = nil
 			scanner.lastQueryFull = false
 			A.scan(addon.rows(5))
-			assert.is_nil(AuctioneerData.lastFullScan)
+			assert.is_nil(AuctioneerData.lastFullScans)
 		end)
 	end)
 
 	describe("auto-scan on opening", function()
 		it("scans when there are no prices yet", function()
-			AuctioneerData.lastFullScan = nil
+			AuctioneerData.lastFullScans = nil
 			env.ah.queries = {}
 			scanner:AutoScan(1)
 			assert.are.equal(1, #env.ah.queries)
@@ -47,14 +47,14 @@ describe("Freshness", function()
 		end)
 
 		it("scans when the last full scan is over an hour old", function()
-			AuctioneerData.lastFullScan = GetServerTime() - 2 * 3600
+			AuctioneerData.lastFullScans = {["6931-Horde"] = GetServerTime() - 2 * 3600}
 			env.ah.queries = {}
 			scanner:AutoScan(1)
 			assert.are.equal(1, #env.ah.queries)
 		end)
 
 		it("leaves fresh prices alone", function()
-			AuctioneerData.lastFullScan = GetServerTime() - 10 * 60
+			AuctioneerData.lastFullScans = {["6931-Horde"] = GetServerTime() - 10 * 60}
 			env.ah.queries = {}
 			scanner:AutoScan(1)
 			assert.are.equal(0, #env.ah.queries)

@@ -80,7 +80,8 @@ end
 
 -- Seconds since the last full scan finished, or nil if there never was one.
 function Module:ScanAge()
-	local last = AuctioneerData and AuctioneerData.lastFullScan
+	local scans = AuctioneerData and AuctioneerData.lastFullScans
+	local last = scans and scans[Auctioneer:AuctionKey()]
 	return last and (GetServerTime() - last)
 end
 
@@ -350,7 +351,8 @@ function Module:Push()
 	-- Only a finished full scan counts as fresh prices; a filtered search or
 	-- one cut short by a tab switch does not.
 	if self.fullScan and self.complete and AuctioneerData then
-		AuctioneerData.lastFullScan = GetServerTime()
+		AuctioneerData.lastFullScans = AuctioneerData.lastFullScans or {}
+		AuctioneerData.lastFullScans[Auctioneer:AuctionKey()] = GetServerTime()
 	end
 
 	local items = self:Collect()

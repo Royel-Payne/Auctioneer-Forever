@@ -197,6 +197,7 @@ function Internal:AuctionHouseOpened()
 		return
 	end
 	self.isOpen = true
+	self.house = Auctioneer:CurrentHouse()
 
 	if not self.ahLoaded then
 		self:AuctionHouseLoaded()
@@ -216,6 +217,7 @@ function Internal:AuctionHouseClosed()
 		return
 	end
 	self.isOpen = false
+	self.house = nil
 
 	for _, event in pairs(self.hookEvents) do
 		--print("Unregistering for event", event)

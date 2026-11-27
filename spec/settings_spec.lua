@@ -21,7 +21,7 @@ describe("Settings", function()
 	describe("auto-scan", function()
 		it("does nothing when switched off", function()
 			A.Auctioneer:SetSetting("autoScan", false)
-			AuctioneerData.lastFullScan = nil
+			AuctioneerData.lastFullScans = nil
 			env.ah.queries = {}
 			scanner:AutoScan(1)
 			assert.are.equal(0, #env.ah.queries)
@@ -29,18 +29,18 @@ describe("Settings", function()
 
 		it("waits the number of hours the player chose", function()
 			A.Auctioneer:SetSetting("autoScanHours", 3)
-			AuctioneerData.lastFullScan = GetServerTime() - 2 * 3600
+			AuctioneerData.lastFullScans = {["6931-Horde"] = GetServerTime() - 2 * 3600}
 			env.ah.queries = {}
 			scanner:AutoScan(1)
 			assert.are.equal(0, #env.ah.queries)
-			AuctioneerData.lastFullScan = GetServerTime() - 4 * 3600
+			AuctioneerData.lastFullScans = {["6931-Horde"] = GetServerTime() - 4 * 3600}
 			scanner:AutoScan(1)
 			assert.are.equal(1, #env.ah.queries)
 		end)
 
 		it("can scan without a chat line", function()
 			A.Auctioneer:SetSetting("announceScan", false)
-			AuctioneerData.lastFullScan = nil
+			AuctioneerData.lastFullScans = nil
 			local before = #env.printed
 			scanner:AutoScan(1)
 			assert.are.equal(before, #env.printed)

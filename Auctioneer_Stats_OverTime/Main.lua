@@ -5,7 +5,27 @@ local Module = Auctioneer:Module("Stats:OverTime")
 local Const = Auctioneer.Const()
 
 -- Hook our methods
+-- Data is kept per server and auction house (see Auctioneer:AuctionKey). Anything
+-- stored under another key predates that: realm names, then the empty name WoW
+-- Forever returns, with every house and ruleset mixed together. It cannot be
+-- sorted out, so it goes.
+local HOUSES = {Horde = true, Alliance = true, Neutral = true}
+function Module.IsHouseKey(key)
+	local house = type(key) == "string" and key:match("^%d+%-(%a+)$")
+	return HOUSES[house] == true
+end
+
+function Module:DropMixedData()
+	if not AuctioneerStatsOverTimeData then return end
+	for key in pairs(AuctioneerStatsOverTimeData) do
+		if not Module.IsHouseKey(key) then
+			AuctioneerStatsOverTimeData[key] = nil
+		end
+	end
+end
+
 function Module:Boot(hook)
+	Module:DropMixedData()
 	hook(Const.ScannerItemsPush, Module.ScannerItemsPush)
 end
 

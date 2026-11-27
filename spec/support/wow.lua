@@ -278,6 +278,19 @@ function wow.install()
 	_G.GetTime = function() return env.clock.now end
 	_G.GetServerTime = function() return 1800000000 + math.floor(env.clock.now) end
 	_G.GetRealmName = function() return "TestRealm" end
+	-- Factions: the player's, and the auctioneer's ("npc"; nil for a goblin house).
+	env.playerFaction, env.npcFaction, env.npcPresent = "Horde", "Horde", true
+	_G.UnitFactionGroup = function(unit)
+		if unit == "player" then return env.playerFaction end
+		if unit == "npc" then return env.npcPresent and env.npcFaction or nil end
+	end
+	_G.UnitGUID = function(unit)
+		if unit == "player" then return "Player-6931-051C6261" end
+	end
+	_G.UnitExists = function(unit)
+		if unit == "npc" then return env.npcPresent end
+		return unit == "player"
+	end
 	_G.IsShiftKeyDown = function() return false end
 	-- In the client no timer fires before the next frame, whatever delay it asks for.
 	local FRAME = 1 / 60

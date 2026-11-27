@@ -110,8 +110,47 @@ function private:Const()
 	return parts.Const
 end
 
+-- Prices are kept per server and auction house, as "<server>-<house>", e.g. "6931-Horde".
+-- WoW Forever gives addons an empty realm name and realm ID 0. A character's GUID
+-- ("Player-6931-051C6261") still names its server, and every character an account
+-- has on one ruleset shares that server, while another ruleset gives another one
+-- (seen 27 Nov 2026). Saved data is per account, so the number keeps rulesets apart.
+-- House is "Horde", "Alliance" or "Neutral" (the goblin houses in Booty Bay,
+-- Gadgetzan and Everlook). At the auction house it is that house's; anywhere else
+-- the player's own faction's.
 function private:AuctionKey()
-	return GetRealmName()
+	local internal = parts.Internal
+	return private:Server() .. "-" .. ((internal and internal.house) or private:PlayerHouse())
+end
+
+local server
+function private:Server()
+	if not server then
+		local guid = UnitGUID("player")
+		server = type(guid) == "string" and guid:match("^Player%-(%d+)%-") or nil
+	end
+	return server or "0"
+end
+
+function private:PlayerHouse()
+	local faction = UnitFactionGroup("player")
+	if faction == "Horde" or faction == "Alliance" then
+		return faction
+	end
+	return "Neutral"
+end
+
+-- The house of the auctioneer being talked to. A goblin auctioneer has no
+-- faction (or "Neutral"); without an NPC to ask, assume the player's own house.
+function private:CurrentHouse()
+	if not UnitExists("npc") then
+		return private:PlayerHouse()
+	end
+	local faction = UnitFactionGroup("npc")
+	if faction == "Horde" or faction == "Alliance" then
+		return faction
+	end
+	return "Neutral"
 end
 
 function private:Timeslice(whole)
@@ -144,6 +183,8 @@ function private:Booted()
 
 	Auctioneer.Trigger = private.Trigger
 	Auctioneer.AuctionKey = private.AuctionKey
+	Auctioneer.PlayerHouse = private.PlayerHouse
+	Auctioneer.CurrentHouse = private.CurrentHouse
 	Auctioneer.Timeslice = private.Timeslice
 
 	Auctioneer.Stat = parts.Statistics.NewStat
